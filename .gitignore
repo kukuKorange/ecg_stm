@@ -1,0 +1,29 @@
+# Keil MDK 编译输出
+Project/Output/
+Project/Listings/
+Project/RTE/
+
+# Keil 用户配置文件
+*.uvguix.*
+
+# 编译产物
+*.o
+*.axf
+*.hex
+*.bin
+*.map
+*.lst
+*.dep
+*.d
+*.crf
+*.lnp
+*.iex
+*.i
+*.sct
+*.htm
+*.build_log.htm
+
+# JLink 调试文件
+JLinkLog.txt
+*.jlink
+
