@@ -1,39 +1,37 @@
 #ifndef _BSP_I2C_H
 #define _BSP_I2C_H
 
-
 #include <inttypes.h>
-#include "main.h"
-extern I2C_HandleTypeDef I2C_Handle;
-#define  i2c_transmit(pdata,data_size)              HAL_I2C_Master_Transmit(&I2C_Handle,I2C_WRITE_ADDR,pdata,data_size,10)
-#define  i2c_receive(pdata,data_size)   			HAL_I2C_Master_Receive(&I2C_Handle,I2C_READ_ADDR,pdata,data_size,10)
-#define  delay_ms(ms)                               HAL_Delay(ms)
+#include "stm32f10x.h"
+#include "stm32f10x_i2c.h"
+#include "stm32f10x_gpio.h"
+#include "stm32f10x_rcc.h"
 
-/* 定义I2C总线连接的GPIO端口, 用户只需要修改下面4行代码即可任意改变SCL和SDA的引脚 */
+/* MAX30102 I2C鍦板潃 */
+#define I2C_WRITE_ADDR 0xAE
+#define I2C_READ_ADDR  0xAF
 
-#define SENSORS_I2C              		      I2C1
-#define SENSORS_I2C_RCC_CLK_ENABLE()   	 __HAL_RCC_I2C1_CLK_ENABLE()
-#define SENSORS_I2C_FORCE_RESET()    		 __HAL_RCC_I2C1_FORCE_RESET()
-#define SENSORS_I2C_RELEASE_RESET()  		 __HAL_RCC_I2C1_RELEASE_RESET()
+/* I2C澶栬瀹氫箟 */
+#define SENSORS_I2C              I2C1
+#define SENSORS_I2C_CLK          RCC_APB1Periph_I2C1
 
-/*引脚定义*/ 
-#define SENSORS_I2C_SCL_GPIO_PORT         GPIOB
-#define SENSORS_I2C_SCL_GPIO_CLK_ENABLE() __HAL_RCC_GPIOB_CLK_ENABLE()
-#define SENSORS_I2C_SCL_GPIO_PIN         	GPIO_PIN_6
- 
-#define SENSORS_I2C_SDA_GPIO_PORT         GPIOB
-#define SENSORS_I2C_SDA_GPIO_CLK_ENABLE()  __HAL_RCC_GPIOB_CLK_ENABLE()
-#define SENSORS_I2C_SDA_GPIO_PIN          GPIO_PIN_7
+/* I2C寮曡剼瀹氫箟 */
+#define SENSORS_I2C_SCL_GPIO_PORT   GPIOB
+#define SENSORS_I2C_SCL_GPIO_CLK    RCC_APB2Periph_GPIOB
+#define SENSORS_I2C_SCL_GPIO_PIN    GPIO_Pin_6
 
-#define SENSORS_I2C_AF                  	 GPIO_AF4_I2C2
+#define SENSORS_I2C_SDA_GPIO_PORT   GPIOB
+#define SENSORS_I2C_SDA_GPIO_CLK    RCC_APB2Periph_GPIOB
+#define SENSORS_I2C_SDA_GPIO_PIN    GPIO_Pin_7
 
+/* I2C瓒呮椂鏃堕棿 */
+#define I2C_TIMEOUT             ((uint32_t)0x1000)
+#define I2C_LONG_TIMEOUT        ((uint32_t)(10 * I2C_TIMEOUT))
 
-
-
+/* 鍑芥暟澹版槑 */
 void I2cMaster_Init(void);
-
-
-
+uint8_t i2c_transmit(uint8_t *pdata, uint8_t data_size);
+uint8_t i2c_receive(uint8_t *pdata, uint8_t data_size);
+void delay_ms(uint16_t ms);
 
 #endif
-

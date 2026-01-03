@@ -1,107 +1,88 @@
 /**
  ******************************************************************************
  * @file    bsp_debug_usart.c
- * @author  fire
- * @version V1.0
- * @date    2016-xx-xx
- * @brief   Ê¹ÓÃ´®¿Ú1£¬ÖØ¶¨Ïòc¿âprintfº¯Êıµ½usart¶Ë¿Ú£¬ÖĞ¶Ï½ÓÊÕÄ£Ê½
- ******************************************************************************
- * @attention
- *
- * ÊµÑéÆ½Ì¨:Ò°»ğ STM32 F103 ¿ª·¢°å
- * ÂÛÌ³    :http://www.firebbs.cn
- * ÌÔ±¦    :http://firestm32.taobao.com
- *
+ * @brief   è°ƒè¯•ä¸²å£é©±åŠ¨ - ä½¿ç”¨STM32æ ‡å‡†åº“
  ******************************************************************************
  */
 
 #include "./usart/bsp_debug_usart.h"
 
-UART_HandleTypeDef UartHandle;
-// extern uint8_t ucTemp;
-
 /**
- * @brief  DEBUG_USART GPIO ÅäÖÃ,¹¤×÷Ä£Ê½ÅäÖÃ¡£115200 8-N-1
- * @param  ÎŞ
- * @retval ÎŞ
+ * @brief  DEBUG_USART GPIO é…ç½®ï¼Œå·¥ä½œæ¨¡å¼é…ç½® 115200 8-N-1
+ * @param  æ— 
+ * @retval æ— 
  */
 void DEBUG_USART_Config(void)
 {
+    GPIO_InitTypeDef GPIO_InitStructure;
+    USART_InitTypeDef USART_InitStructure;
 
-    UartHandle.Instance = DEBUG_USART;
+    /* ä½¿èƒ½GPIOæ—¶é’Ÿ */
+    RCC_APB2PeriphClockCmd(DEBUG_USART_TX_GPIO_CLK | DEBUG_USART_RX_GPIO_CLK, ENABLE);
+    
+    /* ä½¿èƒ½USART1æ—¶é’Ÿ */
+    RCC_APB2PeriphClockCmd(DEBUG_USART_CLK, ENABLE);
 
-    UartHandle.Init.BaudRate = DEBUG_USART_BAUDRATE;
-    UartHandle.Init.WordLength = UART_WORDLENGTH_8B;
-    UartHandle.Init.StopBits = UART_STOPBITS_1;
-    UartHandle.Init.Parity = UART_PARITY_NONE;
-    UartHandle.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-    UartHandle.Init.Mode = UART_MODE_TX_RX;
+    /* é…ç½®USART1 Txå¼•è„šä¸ºå¤ç”¨æ¨æŒ½è¾“å‡º */
+    GPIO_InitStructure.GPIO_Pin = DEBUG_USART_TX_PIN;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_Init(DEBUG_USART_TX_GPIO_PORT, &GPIO_InitStructure);
 
-    HAL_UART_Init(&UartHandle);
+    /* é…ç½®USART1 Rxå¼•è„šä¸ºæµ®ç©ºè¾“å…¥ */
+    GPIO_InitStructure.GPIO_Pin = DEBUG_USART_RX_PIN;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
+    GPIO_Init(DEBUG_USART_RX_GPIO_PORT, &GPIO_InitStructure);
 
-    /*Ê¹ÄÜ´®¿Ú½ÓÊÕ¶Ï */
-    // __HAL_UART_ENABLE_IT(&UartHandle,UART_IT_RXNE);
+    /* USART1é…ç½® */
+    USART_InitStructure.USART_BaudRate = DEBUG_USART_BAUDRATE;
+    USART_InitStructure.USART_WordLength = USART_WordLength_8b;
+    USART_InitStructure.USART_StopBits = USART_StopBits_1;
+    USART_InitStructure.USART_Parity = USART_Parity_No;
+    USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
+    USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;
+    
+    USART_Init(DEBUG_USART, &USART_InitStructure);
+    
+    /* ä½¿èƒ½USART1 */
+    USART_Cmd(DEBUG_USART, ENABLE);
 }
 
-/**
- * @brief UART MSP ³õÊ¼»¯
- * @param huart: UART handle
- * @retval ÎŞ
- */
-void HAL_UART_MspInit(UART_HandleTypeDef *huart)
-{
-    GPIO_InitTypeDef GPIO_InitStruct;
-
-    DEBUG_USART_CLK_ENABLE();
-
-    DEBUG_USART_RX_GPIO_CLK_ENABLE();
-    DEBUG_USART_TX_GPIO_CLK_ENABLE();
-
-    /**USART1 GPIO Configuration
-      PA9     ------> USART1_TX
-      PA10    ------> USART1_RX
-      */
-    /* ÅäÖÃTxÒı½ÅÎª¸´ÓÃ¹¦ÄÜ  */
-    GPIO_InitStruct.Pin = DEBUG_USART_TX_PIN;
-    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-    GPIO_InitStruct.Pull = GPIO_PULLUP;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-    HAL_GPIO_Init(DEBUG_USART_TX_GPIO_PORT, &GPIO_InitStruct);
-
-    /* ÅäÖÃRxÒı½ÅÎª¸´ÓÃ¹¦ÄÜ */
-    GPIO_InitStruct.Pin = DEBUG_USART_RX_PIN;
-    GPIO_InitStruct.Mode = GPIO_MODE_AF_INPUT; // Ä£Ê½ÒªÉèÖÃÎª¸´ÓÃÊäÈëÄ£Ê½£¡
-    HAL_GPIO_Init(DEBUG_USART_RX_GPIO_PORT, &GPIO_InitStruct);
-
-    // HAL_NVIC_SetPriority(DEBUG_USART_IRQ ,0,1);	//ÇÀÕ¼ÓÅÏÈ¼¶0£¬×ÓÓÅÏÈ¼¶1
-    // HAL_NVIC_EnableIRQ(DEBUG_USART_IRQ );		    //Ê¹ÄÜUSART1ÖĞ¶ÏÍ¨µÀ
-}
-
-/*****************  ·¢ËÍ×Ö·û´® **********************/
+/*****************  å‘é€å­—ç¬¦ä¸² **********************/
 void Usart_SendString(uint8_t *str)
 {
     unsigned int k = 0;
     do
     {
-        HAL_UART_Transmit(&UartHandle, (uint8_t *)(str + k), 1, 1000);
+        /* ç­‰å¾…å‘é€ç¼“å†²åŒºç©º */
+        while(USART_GetFlagStatus(DEBUG_USART, USART_FLAG_TXE) == RESET);
+        USART_SendData(DEBUG_USART, *(str + k));
         k++;
     } while (*(str + k) != '\0');
+    
+    /* ç­‰å¾…å‘é€å®Œæˆ */
+    while(USART_GetFlagStatus(DEBUG_USART, USART_FLAG_TC) == RESET);
 }
-// ÖØ¶¨Ïòc¿âº¯Êıprintfµ½´®¿ÚDEBUG_USART£¬ÖØ¶¨Ïòºó¿ÉÊ¹ÓÃprintfº¯Êı
+
+/* é‡å®šå‘cåº“å‡½æ•°printfåˆ°DEBUG_USART */
 int fputc(int ch, FILE *f)
 {
-    /* ·¢ËÍÒ»¸ö×Ö½ÚÊı¾İµ½´®¿ÚDEBUG_USART */
-    HAL_UART_Transmit(&UartHandle, (uint8_t *)&ch, 1, 1000);
+    /* ç­‰å¾…å‘é€ç¼“å†²åŒºç©º */
+    while(USART_GetFlagStatus(DEBUG_USART, USART_FLAG_TXE) == RESET);
+    
+    /* å‘é€ä¸€ä¸ªå­—èŠ‚æ•°æ®åˆ°ä¸²å£DEBUG_USART */
+    USART_SendData(DEBUG_USART, (uint8_t)ch);
 
     return (ch);
 }
 
-// ÖØ¶¨Ïòc¿âº¯Êıscanfµ½´®¿ÚDEBUG_USART£¬ÖØĞ´Ïòºó¿ÉÊ¹ÓÃscanf¡¢getcharµÈº¯Êı
+/* é‡å®šå‘cåº“å‡½æ•°scanfåˆ°DEBUG_USART */
 int fgetc(FILE *f)
 {
-    int ch;
-    HAL_UART_Receive(&UartHandle, (uint8_t *)&ch, 1, 1000);
-    return (ch);
+    /* ç­‰å¾…æ¥æ”¶ç¼“å†²åŒºéç©º */
+    while(USART_GetFlagStatus(DEBUG_USART, USART_FLAG_RXNE) == RESET);
+    
+    return (int)USART_ReceiveData(DEBUG_USART);
 }
 
 /*********************************************END OF FILE**********************/

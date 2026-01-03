@@ -1,4 +1,4 @@
-#define USE_STDPERIPH_DRIVER
+#ifdef USE_STDPERIPH_DRIVER
 
 #include "stm32f10x.h"
 #include "stm32f10x_rcc.h"     // 包含 RCC 外设定义
@@ -61,3 +61,4 @@ uint16_t AD_GetValue(void)
 	while (ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC) == RESET);	//等待EOC标志位，即等待AD转换结束
 	return ADC_GetConversionValue(ADC1);					//读数据寄存器，得到AD转换的结果
 }
+#endif

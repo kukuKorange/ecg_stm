@@ -18,7 +18,7 @@
   ***************************************************************************************
   */
 
-#define USE_STDPERIPH_DRIVER
+#ifdef USE_STDPERIPH_DRIVER
 
 #include "stm32f10x.h"
 #include "stm32f10x_rcc.h"     // 包含 RCC 外设定义
@@ -1409,3 +1409,4 @@ void OLED_DrawArc(uint8_t X, uint8_t Y, uint8_t Radius, int16_t StartAngle, int1
 
 /*****************江协科技|版权所有****************/
 /*****************jiangxiekeji.com*****************/
+#endif

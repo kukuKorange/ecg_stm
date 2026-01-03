@@ -4,13 +4,14 @@
  * @author  fire
  * @version V1.0
  * @date    2024-xx-xx
- * @brief   ¼ì²âĞÄÂÊÓëÑªÑõ
- ******************************************************************************
+ * @brief   æ£€æµ‹å¿ƒç‡ä¸è¡€æ°§ - ä½¿ç”¨STM32æ ‡å‡†åº“
  ******************************************************************************
  */
 
 #include "main.h"
-#include "stm32f1xx.h"
+#include "stm32f10x.h"
+#include "stm32f10x_rcc.h"
+#include "stm32f10x_flash.h"
 #include <stdlib.h>
 #include "usart/bsp_debug_usart.h"
 #include "led/bsp_led.h" 
@@ -26,20 +27,18 @@
 #include "ad8232.h"
 #include "key.h"
 
-/* =========================================º¯ÊıÉêÃ÷Çø====================================== */
+/* =========================================å‡½æ•°ç”³æ˜åŒº====================================== */
 
 void SystemClock_Config(void);
-float Lowpass(float X_last, float X_new, float K);
+static float Lowpass(float X_last, float X_new, float K);
 
-/* =========================================±äÁ¿¶¨ÒåÇø====================================== */
-#define CACHE_NUMS 150//»º´æÊı
-#define PPG_DATA_THRESHOLD 100000 	//¼ì²âãĞÖµ
-uint8_t max30102_int_flag=0;  		//ÖĞ¶Ï±êÖ¾
+/* =========================================å˜é‡å®šä¹‰åŒº====================================== */
+#define CACHE_NUMS 150  /* ç¼“å­˜æ•° */
+#define PPG_DATA_THRESHOLD 100000   /* æ£€æµ‹é˜ˆå€¼ */
+uint8_t max30102_int_flag = 0;      /* ä¸­æ–­æ ‡å¿— */
 
-float ppg_data_cache_RED[CACHE_NUMS]={0};  //»º´æÇø
-float ppg_data_cache_IR[CACHE_NUMS]={0};  //»º´æÇø
-I2C_HandleTypeDef I2C_Handle;
-
+float ppg_data_cache_RED[CACHE_NUMS] = {0};  /* ç¼“å­˜åŒº */
+float ppg_data_cache_IR[CACHE_NUMS] = {0};   /* ç¼“å­˜åŒº */
 
 uint16_t Chart[250];
 uint16_t Chart_1[120];
@@ -49,188 +48,182 @@ uint16_t HR_last = 0;
 uint8_t KeyNum;
 
 /**
- * @brief  Ö÷º¯Êı
- * @param  ÎŞ
- * @retval ÎŞ
+ * @brief  ä¸»å‡½æ•°
+ * @param  æ— 
+ * @retval æ— 
  */
 int main(void)
 {
-   uint16_t cache_counter=0;  //»º´æ¼ÆÊıÆ÷
-	float max30102_data[2],fir_output[2];
+    uint16_t cache_counter = 0;  /* ç¼“å­˜è®¡æ•°å™¨ */
+    float max30102_data[2], fir_output[2];
     
-    HAL_Init();
-	/* ³õÊ¼»¯ÏµÍ³Ê±ÖÓÎª72MHz */
+    /* é…ç½®NVICä¼˜å…ˆçº§åˆ†ç»„ */
+    NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
+    
+    /* åˆå§‹åŒ–ç³»ç»Ÿæ—¶é’Ÿä¸º72MHz */
     SystemClock_Config();
-    /* ³õÊ¼»¯USART ÅäÖÃÄ£Ê½Îª 115200 8-N-1 */
-//    DEBUG_USART_Config();
-//	/* ³õÊ¼»¯LED */
-	LED_GPIO_Config();
     
-  /* ³õÊ¼»¯ĞÄÂÊÑªÑõÄ£¿é */
-	max30102_init();
-  /* FIRÂË²¨¼ÆËã³õÊ¼»¯ */
-	max30102_fir_init();
-	OLED_Init();
-	
-	usart2_init(115200);	 //´®¿Ú2³õÊ¼»¯(PA2/PA3)Îª115200 esp-01sÍ¨ĞÅ
-	ESP8266_Init();
+    /* åˆå§‹åŒ–LED */
+    LED_GPIO_Config();
+    
+    /* åˆå§‹åŒ–å¿ƒç‡è¡€æ°§æ¨¡å— */
+    max30102_init();
+    
+    /* FIRæ»¤æ³¢è®¡ç®—åˆå§‹åŒ– */
+    max30102_fir_init();
+    
+    OLED_Init();
+    
+    usart2_init(115200);     /* ä¸²å£2åˆå§‹åŒ–(PA2/PA3)ä¸º115200 esp-01sé€šä¿¡ */
+    ESP8266_Init();
 
-	/* ĞÄµçÍ¼ÍâÉèÅäÖÃ */
-	AD_Init();
-	AD8232Init();
-	Timer3_Init();
-	/* ĞÄµçÍ¼ÍâÉèÅäÖÃ */
-	
-	Key_Init();
-	
-	
-	/* ×ø±êÏµ»æÖÆ */
-	OLED_DrawLine(1,62,120,62);
-	OLED_DrawLine(1,8,1,62);
-	OLED_DrawTriangle(1,6,0,8,2,8,OLED_UNFILLED);
-	OLED_DrawTriangle(120,63,120,61,123,62,OLED_UNFILLED);
-	OLED_Update();
-	/* ×ø±êÏµ»æÖÆ */
-	
-	while(1)
-	{
-//		KeyNum = Key_GetNum();
-
-		
-		OLED_ShowNum(1,20,test,2,OLED_6X8);
-		OLED_Update();
-
-//		if(GetConnect())
-//		{
-//			OLED_ShowString(8,1,"Connected",OLED_6X8);
-//		}
-//		else
-//		{
-//			OLED_ShowString(8,1,"Disconnect",OLED_6X8);
-//		}
-		
-		if(1)			//ÖĞ¶ÏĞÅºÅ²úÉú
-		{ 
-				max30102_int_flag = 0;
-				max30102_fifo_read(max30102_data);		//¶ÁÈ¡Êı¾İ
-		
-				ir_max30102_fir(&max30102_data[0],&fir_output[0]);//Êµ²âirÊı¾İ²É¼¯ÔÚÇ°Ãæ£¬redÊı¾İÔÚºóÃæ
-				red_max30102_fir(&max30102_data[1],&fir_output[1]);  //ÂË²¨
-		
-				if((max30102_data[0]>PPG_DATA_THRESHOLD)&&(max30102_data[1]>PPG_DATA_THRESHOLD))  //´óÓÚãĞÖµ£¬ËµÃ÷´«¸ĞÆ÷ÓĞ½Ó´¥
-				{		
-						ppg_data_cache_IR[cache_counter]=fir_output[0];
-						ppg_data_cache_RED[cache_counter]=fir_output[1];
-						cache_counter++;
-						LED1_ON
-				}
-				else				//Ğ¡ÓÚãĞÖµ
-				{
-						cache_counter=0;
-						LED1_OFF
-						HR_new = 0;
-				}
-
-
-				if(cache_counter>=CACHE_NUMS)  //ÊÕ¼¯ÂúÁËÊı¾İ
-				{
-//                printf("ĞÄÂÊ£º%d  ´Î/min   ",max30102_getHeartRate(ppg_data_cache_IR,CACHE_NUMS));
-//                printf("ÑªÑõ£º%.2f  %%\n",max30102_getSpO2(ppg_data_cache_IR,ppg_data_cache_RED,CACHE_NUMS));
-						cache_counter=0;
-						HR_new = Lowpass(HR_last,max30102_getHeartRate(ppg_data_cache_IR,CACHE_NUMS),0.6);
-						OLED_ShowNum(5,1,max30102_getHeartRate(ppg_data_cache_IR,CACHE_NUMS),2,OLED_6X8);
-						OLED_ShowNum(20,1,max30102_getSpO2(ppg_data_cache_IR,ppg_data_cache_RED,CACHE_NUMS),2,OLED_6X8);
-						OLED_Update();
-						HR_last = max30102_getHeartRate(ppg_data_cache_IR,CACHE_NUMS);
-						ESP8266_Send("HeartRate",(int)HR_new);
-				}
-				
-				
-		}
-		
-		if(HR_new >= 70) //¼ì²âĞÄÂÊÖµÊÇ·ñ³¬³ö80
-		{
-			LED2_ON //·äÃùÆ÷¿ª
-		}
-		else
-		{
-			LED2_OFF
-		}
-				
-				
-	}
-}
-
-
-
-
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
-{
-    if(GPIO_Pin==MAX30102_INT_Pin)
+    /* å¿ƒç”µå›¾å¤–è®¾é…ç½® */
+    AD_Init();
+    AD8232Init();
+    Timer3_Init();
+    /* å¿ƒç”µå›¾å¤–è®¾é…ç½® */
+    
+    Key_Init();
+    
+    /* åæ ‡ç³»ç»˜åˆ¶ */
+    OLED_DrawLine(1, 62, 120, 62);
+    OLED_DrawLine(1, 8, 1, 62);
+    OLED_DrawTriangle(1, 6, 0, 8, 2, 8, OLED_UNFILLED);
+    OLED_DrawTriangle(120, 63, 120, 61, 123, 62, OLED_UNFILLED);
+    OLED_Update();
+    /* åæ ‡ç³»ç»˜åˆ¶ */
+    
+    while(1)
     {
-        max30102_int_flag=1;
+        OLED_ShowNum(1, 20, test, 2, OLED_6X8);
+        OLED_Update();
+        
+        if(1)  /* ä¸­æ–­ä¿¡å·äº§ç”Ÿ */
+        { 
+            max30102_int_flag = 0;
+            max30102_fifo_read(max30102_data);      /* è¯»å–æ•°æ® */
+        
+            ir_max30102_fir(&max30102_data[0], &fir_output[0]);  /* å®æµ‹iræ•°æ®é‡‡é›†åœ¨å‰é¢ï¼Œredæ•°æ®åœ¨åé¢ */
+            red_max30102_fir(&max30102_data[1], &fir_output[1]); /* æ»¤æ³¢ */
+        
+            if((max30102_data[0] > PPG_DATA_THRESHOLD) && (max30102_data[1] > PPG_DATA_THRESHOLD))  /* å¤§äºé˜ˆå€¼ï¼Œè¯´æ˜ä¼ æ„Ÿå™¨æœ‰æ¥è§¦ */
+            {       
+                ppg_data_cache_IR[cache_counter] = fir_output[0];
+                ppg_data_cache_RED[cache_counter] = fir_output[1];
+                cache_counter++;
+                LED1_ON
+            }
+            else  /* å°äºé˜ˆå€¼ */
+            {
+                cache_counter = 0;
+                LED1_OFF
+                HR_new = 0;
+            }
+
+            if(cache_counter >= CACHE_NUMS)  /* æ”¶é›†æ»¡äº†æ•°æ® */
+            {
+                cache_counter = 0;
+                HR_new = Lowpass(HR_last, max30102_getHeartRate(ppg_data_cache_IR, CACHE_NUMS), 0.6);
+                OLED_ShowNum(5, 1, max30102_getHeartRate(ppg_data_cache_IR, CACHE_NUMS), 2, OLED_6X8);
+                OLED_ShowNum(20, 1, max30102_getSpO2(ppg_data_cache_IR, ppg_data_cache_RED, CACHE_NUMS), 2, OLED_6X8);
+                OLED_Update();
+                HR_last = max30102_getHeartRate(ppg_data_cache_IR, CACHE_NUMS);
+                ESP8266_Send("HeartRate", (int)HR_new);
+            }
+        }
+        
+        if(HR_new >= 70)  /* æ£€æµ‹å¿ƒç‡å€¼æ˜¯å¦è¶…å‡º80 */
+        {
+            LED2_ON  /* èœ‚é¸£å™¨å¼€ */
+        }
+        else
+        {
+            LED2_OFF
+        }
     }
 }
+
 /**
- * @brief  System Clock Configuration
- *         The system Clock is configured as follow :
- *            System Clock source            = PLL (HSE)
- *            SYSCLK(Hz)                     = 72000000
- *            HCLK(Hz)                       = 72000000
- *            AHB Prescaler                  = 1
- *            APB1 Prescaler                 = 2
- *            APB2 Prescaler                 = 1
- *            HSE Frequency(Hz)              = 8000000
- *            HSE PREDIV1                    = 1
- *            PLLMUL                         = 9
- *            Flash Latency(WS)              = 2
+ * @brief  ä½é€šæ»¤æ³¢å‡½æ•°
+ */
+static float Lowpass(float X_last, float X_new, float K)
+{
+    return X_last + K * (X_new - X_last);
+}
+
+/**
+ * @brief  ç³»ç»Ÿæ—¶é’Ÿé…ç½®
+ *         ç³»ç»Ÿæ—¶é’Ÿé…ç½®å¦‚ä¸‹:
+ *            ç³»ç»Ÿæ—¶é’Ÿæº               = PLL (HSE)
+ *            SYSCLK(Hz)              = 72000000
+ *            HCLK(Hz)                = 72000000
+ *            AHB Prescaler           = 1
+ *            APB1 Prescaler          = 2
+ *            APB2 Prescaler          = 1
+ *            HSE Frequency(Hz)       = 8000000
+ *            PLL MUL                 = 9
+ *            Flash Latency(WS)       = 2
  * @param  None
  * @retval None
  */
 void SystemClock_Config(void)
 {
-    RCC_ClkInitTypeDef clkinitstruct = {0};
-    RCC_OscInitTypeDef oscinitstruct = {0};
-
-    /* Enable HSE Oscillator and activate PLL with HSE as source */
-    oscinitstruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
-    oscinitstruct.HSEState = RCC_HSE_ON;
-    oscinitstruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
-    oscinitstruct.PLL.PLLState = RCC_PLL_ON;
-    oscinitstruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
-    oscinitstruct.PLL.PLLMUL = RCC_PLL_MUL9;
-    if (HAL_RCC_OscConfig(&oscinitstruct) != HAL_OK)
+    ErrorStatus HSEStartUpStatus;
+    
+    /* å¤ä½RCCæ—¶é’Ÿé…ç½®ä¸ºé»˜è®¤çŠ¶æ€ */
+    RCC_DeInit();
+    
+    /* ä½¿èƒ½å¤–éƒ¨é«˜é€Ÿæ™¶æŒ¯HSE */
+    RCC_HSEConfig(RCC_HSE_ON);
+    
+    /* ç­‰å¾…HSEå¯åŠ¨ç¨³å®š */
+    HSEStartUpStatus = RCC_WaitForHSEStartUp();
+    
+    if(HSEStartUpStatus == SUCCESS)
     {
-        /* Initialization Error */
-        while (1)
-            ;
+        /* ä½¿èƒ½Flashé¢„å–ç¼“å†²åŒº */
+        FLASH_PrefetchBufferCmd(FLASH_PrefetchBuffer_Enable);
+        
+        /* è®¾ç½®Flashç­‰å¾…å‘¨æœŸï¼ŒSYSCLK > 48MHzéœ€è¦2ä¸ªç­‰å¾…å‘¨æœŸ */
+        FLASH_SetLatency(FLASH_Latency_2);
+        
+        /* è®¾ç½®AHBæ—¶é’Ÿ(HCLK) = SYSCLK */
+        RCC_HCLKConfig(RCC_SYSCLK_Div1);
+        
+        /* è®¾ç½®APB2æ—¶é’Ÿ(PCLK2) = HCLK */
+        RCC_PCLK2Config(RCC_HCLK_Div1);
+        
+        /* è®¾ç½®APB1æ—¶é’Ÿ(PCLK1) = HCLK/2 */
+        RCC_PCLK1Config(RCC_HCLK_Div2);
+        
+        /* é…ç½®PLL: PLLCLK = HSE * 9 = 72MHz */
+        RCC_PLLConfig(RCC_PLLSource_HSE_Div1, RCC_PLLMul_9);
+        
+        /* ä½¿èƒ½PLL */
+        RCC_PLLCmd(ENABLE);
+        
+        /* ç­‰å¾…PLLç¨³å®š */
+        while(RCC_GetFlagStatus(RCC_FLAG_PLLRDY) == RESET);
+        
+        /* é€‰æ‹©PLLä½œä¸ºç³»ç»Ÿæ—¶é’Ÿæº */
+        RCC_SYSCLKConfig(RCC_SYSCLKSource_PLLCLK);
+        
+        /* ç­‰å¾…PLLè¢«é€‰ä¸ºç³»ç»Ÿæ—¶é’Ÿæº */
+        while(RCC_GetSYSCLKSource() != 0x08);
     }
-
-    /* Select PLL as system clock source and configure the HCLK, PCLK1 and PCLK2
-       clocks dividers */
-    clkinitstruct.ClockType = (RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2);
-    clkinitstruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
-    clkinitstruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-    clkinitstruct.APB2CLKDivider = RCC_HCLK_DIV1;
-    clkinitstruct.APB1CLKDivider = RCC_HCLK_DIV2;
-    if (HAL_RCC_ClockConfig(&clkinitstruct, FLASH_LATENCY_2) != HAL_OK)
+    else
     {
-        /* Initialization Error */
-        while (1)
-            ;
+        /* HSEå¯åŠ¨å¤±è´¥ï¼Œç”¨æˆ·å¯åœ¨æ­¤æ·»åŠ é”™è¯¯å¤„ç† */
+        while(1);
     }
 }
 
-
-
+/**
+ * @brief  é”™è¯¯å¤„ç†å‡½æ•°
+ */
 void Error_Handler(void)
 {
-  /* USER CODE BEGIN Error_Handler_Debug */
-  /* User can add his own implementation to report the HAL error return state */
-
-  /* USER CODE END Error_Handler_Debug */
+    while(1);
 }
-
-
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

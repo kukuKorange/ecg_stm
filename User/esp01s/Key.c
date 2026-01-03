@@ -1,4 +1,4 @@
-#define USE_STDPERIPH_DRIVER
+#ifdef USE_STDPERIPH_DRIVER
 
 #include "stm32f10x.h"
 #include "stm32f10x_rcc.h"     // 包含 RCC 外设定义
@@ -77,3 +77,4 @@ uint8_t Key_GetNum(void)
 	
 	return KeyNum;			//返回键码值，如果没有按键按下，所有if都不成立，则键码为默认值0
 }
+#endif

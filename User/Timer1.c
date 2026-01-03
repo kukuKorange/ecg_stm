@@ -1,5 +1,4 @@
-
-#define USE_STDPERIPH_DRIVER
+#ifdef USE_STDPERIPH_DRIVER
 
 #include "timer1.h"
 #include "stm32f10x.h"                  // Device header
@@ -67,3 +66,4 @@ void TIM2_IRQHandler(void)
 	}
 }
 */
+#endif

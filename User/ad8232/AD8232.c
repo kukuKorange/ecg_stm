@@ -1,7 +1,7 @@
-#define USE_STDPERIPH_DRIVER
+#ifdef USE_STDPERIPH_DRIVER
 
 #include "stm32f10x.h"
-#include "stm32f10x_rcc.h"     // °üº¬ RCC ÍâÉè¶¨Òå
+#include "stm32f10x_rcc.h"     // ï¿½ï¿½ï¿½ï¿½ RCC ï¿½ï¿½ï¿½è¶¨ï¿½ï¿½
 #include "stm32f10x_gpio.h"
 #include "ad8232.h"
 #include "OLED.h"  
@@ -10,19 +10,19 @@ void AD8232Init(void)
 {
 	GPIO_InitTypeDef GPIO_InitStructure;
 
-	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);	// GPIOBÊ±ÖÓ
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);	// GPIOBÊ±ï¿½ï¿½
 
 	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0; 
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;	//¸¡¿ÕÊäÈë
-	GPIO_Init(GPIOB, &GPIO_InitStructure); //³õÊ¼»¯PB0
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;	//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+	GPIO_Init(GPIOB, &GPIO_InitStructure); //ï¿½ï¿½Ê¼ï¿½ï¿½PB0
    
 	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_1;
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;//¸¡¿ÕÊäÈë
-	GPIO_Init(GPIOB, &GPIO_InitStructure);  //³õÊ¼»¯PB1
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+	GPIO_Init(GPIOB, &GPIO_InitStructure);  //ï¿½ï¿½Ê¼ï¿½ï¿½PB1
 	
 }
-//ÓÃÓÚÅÐ¶ÏÁ¬½Ó×´Ì¬
+//ï¿½ï¿½ï¿½ï¿½ï¿½Ð¶ï¿½ï¿½ï¿½ï¿½ï¿½×´Ì¬
 uint8_t GetConnect(void)
 {
 	uint8_t B0,B1;
@@ -80,13 +80,5 @@ void ChartOptimize(uint16_t *R,uint16_t *Chart)
 	}
 }
 
-/**
-  * @brief  µÍÍ¨ÂË²¨
-  * @param  
-  * @retval 
-  */
-float Lowpass(float X_last, float X_new, float K)
-{
-	return (X_last + (X_new - X_last) * K);
-}
 
+#endif

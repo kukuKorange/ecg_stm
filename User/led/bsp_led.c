@@ -1,62 +1,39 @@
 /**
  ******************************************************************************
  * @file    bsp_led.c
- * @author  fire
- * @version V1.0
- * @date    2017-xx-xx
- * @brief   ledÓ¦ÓÃº¯Êı½Ó¿Ú
- ******************************************************************************
- * @attention
- *
- * ÊµÑéÆ½Ì¨:Ò°»ğ STM32 F103 ¿ª·¢°å
- * ÂÛÌ³    :http://www.firebbs.cn
- * ÌÔ±¦    :http://firestm32.taobao.com
- *
+ * @brief   LEDåº”ç”¨å‡½æ•°æ¥å£ - ä½¿ç”¨STM32æ ‡å‡†åº“
  ******************************************************************************
  */
 
 #include "./led/bsp_led.h"
 
 /**
- * @brief  ³õÊ¼»¯¿ØÖÆLEDµÄIO
- * @param  ÎŞ
- * @retval ÎŞ
+ * @brief  åˆå§‹åŒ–æ§åˆ¶LEDçš„IO
+ * @param  æ— 
+ * @retval æ— 
  */
 void LED_GPIO_Config(void)
 {
+    GPIO_InitTypeDef GPIO_InitStructure;
 
-    /*¶¨ÒåÒ»¸öGPIO_InitTypeDefÀàĞÍµÄ½á¹¹Ìå*/
-    GPIO_InitTypeDef GPIO_InitStruct;
+    /* å¼€å¯LEDç›¸å…³çš„GPIOå¤–è®¾æ—¶é’Ÿ */
+    RCC_APB2PeriphClockCmd(LED1_GPIO_CLK | LED2_GPIO_CLK | LED3_GPIO_CLK, ENABLE);
 
-    /*¿ªÆôLEDÏà¹ØµÄGPIOÍâÉèÊ±ÖÓ*/
-    LED1_GPIO_CLK_ENABLE();
-    LED2_GPIO_CLK_ENABLE();
-    LED3_GPIO_CLK_ENABLE();
+    /* é…ç½®LED1å¼•è„š */
+    GPIO_InitStructure.GPIO_Pin = LED1_PIN;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;    /* æ¨æŒ½è¾“å‡º */
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_Init(LED1_GPIO_PORT, &GPIO_InitStructure);
 
-    /*Ñ¡ÔñÒª¿ØÖÆµÄGPIOÒı½Å*/
-    GPIO_InitStruct.Pin = LED1_PIN;
+    /* é…ç½®LED2å¼•è„š */
+    GPIO_InitStructure.GPIO_Pin = LED2_PIN;
+    GPIO_Init(LED2_GPIO_PORT, &GPIO_InitStructure);
 
-    /*ÉèÖÃÒı½ÅµÄÊä³öÀàĞÍÎªÍÆÍìÊä³ö*/
-    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    /* é…ç½®LED3å¼•è„š */
+    GPIO_InitStructure.GPIO_Pin = LED3_PIN;
+    GPIO_Init(LED3_GPIO_PORT, &GPIO_InitStructure);
 
-    /*ÉèÖÃÒı½ÅÎªÉÏÀ­Ä£Ê½*/
-    GPIO_InitStruct.Pull = GPIO_PULLUP;
-
-    /*ÉèÖÃÒı½ÅËÙÂÊÎª¸ßËÙ */
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-
-    /*µ÷ÓÃ¿âº¯Êı£¬Ê¹ÓÃÉÏÃæÅäÖÃµÄGPIO_InitStructure³õÊ¼»¯GPIO*/
-    HAL_GPIO_Init(LED1_GPIO_PORT, &GPIO_InitStruct);
-
-    /*Ñ¡ÔñÒª¿ØÖÆµÄGPIOÒı½Å*/
-    GPIO_InitStruct.Pin = LED2_PIN;
-    HAL_GPIO_Init(LED2_GPIO_PORT, &GPIO_InitStruct);
-
-    /*Ñ¡ÔñÒª¿ØÖÆµÄGPIOÒı½Å*/
-    GPIO_InitStruct.Pin = LED3_PIN;
-    HAL_GPIO_Init(LED3_GPIO_PORT, &GPIO_InitStruct);
-
-    /*¹Ø±ÕRGBµÆ*/
+    /* å…³é—­æ‰€æœ‰LED */
     LED_RGBOFF;
 }
 

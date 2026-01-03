@@ -1,159 +1,193 @@
 #include "max30102.h"
 #include "./i2c/bsp_i2c.h"
+#include "stm32f10x_exti.h"
+#include "misc.h"
 
-
-void max30102_i2c_write(uint8_t reg_adder,uint8_t data)
+/**
+  * @brief  MAX30102 I2Cå†™å¯„å­˜å™¨
+  * @param  reg_adder: å¯„å­˜å™¨åœ°å€
+  * @param  data: å†™å…¥æ•°æ®
+  */
+void max30102_i2c_write(uint8_t reg_adder, uint8_t data)
 {
-	uint8_t transmit_data[2];
-	transmit_data[0] = reg_adder;
-	transmit_data[1] = data;
-	i2c_transmit(transmit_data,2);
+    uint8_t transmit_data[2];
+    transmit_data[0] = reg_adder;
+    transmit_data[1] = data;
+    i2c_transmit(transmit_data, 2);
 }
 
-void max30102_i2c_read(uint8_t reg_adder,uint8_t *pdata, uint8_t data_size)
+/**
+  * @brief  MAX30102 I2Cè¯»å¯„å­˜å™¨
+  * @param  reg_adder: å¯„å­˜å™¨åœ°å€
+  * @param  pdata: æ•°æ®ç¼“å†²åŒº
+  * @param  data_size: è¯»å–é•¿åº¦
+  */
+void max30102_i2c_read(uint8_t reg_adder, uint8_t *pdata, uint8_t data_size)
 {
     uint8_t adder = reg_adder;
-    i2c_transmit(&adder,1);
-    i2c_receive(pdata,data_size);
+    i2c_transmit(&adder, 1);
+    i2c_receive(pdata, data_size);
 }
 
+/**
+  * @brief  MAX30102ä¸­æ–­å¼•è„šåˆå§‹åŒ– (ä½¿ç”¨æ ‡å‡†åº“)
+  */
 void max30102_int_gpio_init(void)
 {
-    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    GPIO_InitTypeDef GPIO_InitStructure;
+    EXTI_InitTypeDef EXTI_InitStructure;
+    NVIC_InitTypeDef NVIC_InitStructure;
 
-    /* GPIO Ports Clock Enable */
-    __HAL_RCC_GPIOB_CLK_ENABLE();
-    __HAL_RCC_AFIO_CLK_ENABLE(); 
+    /* ä½¿èƒ½GPIOæ—¶é’Ÿå’ŒAFIOæ—¶é’Ÿ */
+    RCC_APB2PeriphClockCmd(MAX30102_INT_GPIO_CLK | RCC_APB2Periph_AFIO, ENABLE);
 
-    /*Configure GPIO pin : MAX30102_INT_Pin */
-    GPIO_InitStruct.Pin = MAX30102_INT_Pin;
-    GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
-    GPIO_InitStruct.Pull = GPIO_PULLUP;
-    HAL_GPIO_Init(MAX30102_INT_GPIO_Port, &GPIO_InitStruct);
+    /* é…ç½®GPIOä¸ºä¸Šæ‹‰è¾“å…¥ */
+    GPIO_InitStructure.GPIO_Pin = MAX30102_INT_Pin;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;  /* ä¸Šæ‹‰è¾“å…¥ */
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_Init(MAX30102_INT_GPIO_Port, &GPIO_InitStructure);
 
-    /* EXTI interrupt init*/
-    HAL_NVIC_SetPriority(EXTI9_5_IRQn, 5, 0);
-    HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+    /* é…ç½®EXTI */
+    GPIO_EXTILineConfig(MAX30102_INT_EXTI_PortSource, MAX30102_INT_EXTI_PinSource);
 
+    EXTI_InitStructure.EXTI_Line = MAX30102_INT_EXTI_Line;
+    EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
+    EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Falling;  /* ä¸‹é™æ²¿è§¦å‘ */
+    EXTI_InitStructure.EXTI_LineCmd = ENABLE;
+    EXTI_Init(&EXTI_InitStructure);
+
+    /* é…ç½®NVIC */
+    NVIC_InitStructure.NVIC_IRQChannel = MAX30102_INT_EXTI_IRQn;
+    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 5;
+    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
+    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+    NVIC_Init(&NVIC_InitStructure);
 }
 
+/**
+  * @brief  MAX30102åˆå§‹åŒ–
+  */
 void max30102_init(void)
 { 
-	uint8_t data;
-	
-	I2cMaster_Init();   //³õÊ¼»¯I2C½Ó¿Ú
-	delay_ms(500);
+    uint8_t data;
     
-    max30102_int_gpio_init();   //ÖĞ¶ÏÒı½ÅÅäÖÃ
+    I2cMaster_Init();   /* åˆå§‹åŒ–I2Cæ¥å£ */
+    delay_ms(500);
     
-	max30102_i2c_write(MODE_CONFIGURATION,0x40);  //reset the device
-	
-	delay_ms(5);
-	
-	max30102_i2c_write(INTERRUPT_ENABLE1,0xE0);
-	max30102_i2c_write(INTERRUPT_ENABLE2,0x00);  //interrupt enable: FIFO almost full flag, new FIFO Data Ready,
-																						 	//                   ambient light cancellation overflow, power ready flag, 
-																							//						    		internal temperature ready flag
-	
-	max30102_i2c_write(FIFO_WR_POINTER,0x00);
-	max30102_i2c_write(FIFO_OV_COUNTER,0x00);
-	max30102_i2c_write(FIFO_RD_POINTER,0x00);   //clear the pointer
-	
-	max30102_i2c_write(FIFO_CONFIGURATION,0x4F); //FIFO configuration: sample averaging(4),FIFO rolls on full(0), FIFO almost full value(15 empty data samples when interrupt is issued)  
-	
-	max30102_i2c_write(MODE_CONFIGURATION,0x03);  //MODE configuration:SpO2 mode
-	
-	max30102_i2c_write(SPO2_CONFIGURATION,0x2A); //SpO2 configuration:ACD resolution:15.63pA,sample rate control:200Hz, LED pulse width:215 us 
-	
-	max30102_i2c_write(LED1_PULSE_AMPLITUDE,0x2f);	//IR LED
-	max30102_i2c_write(LED2_PULSE_AMPLITUDE,0x2f); //RED LED current
-	
-	max30102_i2c_write(TEMPERATURE_CONFIG,0x01);   //temp
-	
-	max30102_i2c_read(INTERRUPT_STATUS1,&data,1);
-	max30102_i2c_read(INTERRUPT_STATUS2,&data,1);  //clear status
-	
-	
+    max30102_int_gpio_init();   /* ä¸­æ–­å¼•è„šé…ç½® */
+    
+    max30102_i2c_write(MODE_CONFIGURATION, 0x40);  /* reset the device */
+    
+    delay_ms(5);
+    
+    max30102_i2c_write(INTERRUPT_ENABLE1, 0xE0);
+    max30102_i2c_write(INTERRUPT_ENABLE2, 0x00);  /* interrupt enable: FIFO almost full flag, new FIFO Data Ready,
+                                                     ambient light cancellation overflow, power ready flag, 
+                                                     internal temperature ready flag */
+    
+    max30102_i2c_write(FIFO_WR_POINTER, 0x00);
+    max30102_i2c_write(FIFO_OV_COUNTER, 0x00);
+    max30102_i2c_write(FIFO_RD_POINTER, 0x00);   /* clear the pointer */
+    
+    max30102_i2c_write(FIFO_CONFIGURATION, 0x4F); /* FIFO configuration: sample averaging(4), FIFO rolls on full(0), 
+                                                     FIFO almost full value(15 empty data samples when interrupt is issued) */
+    
+    max30102_i2c_write(MODE_CONFIGURATION, 0x03);  /* MODE configuration: SpO2 mode */
+    
+    max30102_i2c_write(SPO2_CONFIGURATION, 0x2A); /* SpO2 configuration: ACD resolution:15.63pA, sample rate control:200Hz, 
+                                                     LED pulse width:215 us */
+    
+    max30102_i2c_write(LED1_PULSE_AMPLITUDE, 0x2f);   /* IR LED */
+    max30102_i2c_write(LED2_PULSE_AMPLITUDE, 0x2f);   /* RED LED current */
+    
+    max30102_i2c_write(TEMPERATURE_CONFIG, 0x01);     /* temp */
+    
+    max30102_i2c_read(INTERRUPT_STATUS1, &data, 1);
+    max30102_i2c_read(INTERRUPT_STATUS2, &data, 1);  /* clear status */
 }
 
-
+/**
+  * @brief  è¯»å–MAX30102 FIFOæ•°æ®
+  * @param  output_data: è¾“å‡ºæ•°æ® (floatæ•°ç»„, è‡³å°‘2ä¸ªå…ƒç´ )
+  */
 void max30102_fifo_read(float *output_data)
 {
     uint8_t receive_data[6];
-	uint32_t data[2];
-	max30102_i2c_read(FIFO_DATA,receive_data,6);
+    uint32_t data[2];
+    max30102_i2c_read(FIFO_DATA, receive_data, 6);
     data[0] = ((receive_data[0]<<16 | receive_data[1]<<8 | receive_data[2]) & 0x03ffff);
     data[1] = ((receive_data[3]<<16 | receive_data[4]<<8 | receive_data[5]) & 0x03ffff);
-	*output_data = data[0];
-	*(output_data+1) = data[1];
-
+    *output_data = data[0];
+    *(output_data+1) = data[1];
 }
 
-uint16_t max30102_getHeartRate(float *input_data,uint16_t cache_nums)
+/**
+  * @brief  è®¡ç®—å¿ƒç‡
+  * @param  input_data: è¾“å…¥PPGæ•°æ®
+  * @param  cache_nums: æ•°æ®ç‚¹æ•°é‡
+  * @retval å¿ƒç‡å€¼ (æ¬¡/åˆ†)
+  */
+uint16_t max30102_getHeartRate(float *input_data, uint16_t cache_nums)
 {
-		float input_data_sum_aver = 0;
-		uint16_t i,temp;
-		
-		
-		for(i=0;i<cache_nums;i++)
-		{
-		input_data_sum_aver += *(input_data+i);
-		}
-		input_data_sum_aver = input_data_sum_aver/cache_nums;
-		for(i=0;i<cache_nums;i++)
-		{
-				if((*(input_data+i)>input_data_sum_aver)&&(*(input_data+i+1)<input_data_sum_aver))
-				{
-					temp = i;
-					break;
-				}
-		}
-		i++;
-		for(;i<cache_nums;i++)
-		{
-				if((*(input_data+i)>input_data_sum_aver)&&(*(input_data+i+1)<input_data_sum_aver))
-				{
-					temp = i - temp;
-					break;
-				}
-		}
-		if((temp>14)&&(temp<100))
-		{
-			//SpO2²ÉÑùÆµÂÊ200Hz£¬FIFO²ÉÑùÆ½¾ù¹ıÂËÖµÎª4£¬ËùÒÔ×îÖÕ²ÉÑùÆµÂÊËãÎª50Hz
-            return 3000/temp;//²ÉÑùÒ»´ÎµÄÖÜÆÚÊÇ0.02s£¬tempÊÇÒ»´ÎĞÄÌø¹ı³ÌÖĞµÄ²ÉÑùµã¸öÊı£¬Ò»´ÎĞÄÌø¾ÍÊÇtemp/50Ãë,Ò»·ÖÖÓĞÄÌøÊı¾ÍÊÇ60/(temp/50)
-		}
-		else
-		{
-			return 0;
-		}
+    float input_data_sum_aver = 0;
+    uint16_t i, temp;
+    
+    for(i = 0; i < cache_nums; i++) {
+        input_data_sum_aver += *(input_data + i);
+    }
+    input_data_sum_aver = input_data_sum_aver / cache_nums;
+    
+    for(i = 0; i < cache_nums; i++) {
+        if((*(input_data + i) > input_data_sum_aver) && (*(input_data + i + 1) < input_data_sum_aver)) {
+            temp = i;
+            break;
+        }
+    }
+    i++;
+    for(; i < cache_nums; i++) {
+        if((*(input_data + i) > input_data_sum_aver) && (*(input_data + i + 1) < input_data_sum_aver)) {
+            temp = i - temp;
+            break;
+        }
+    }
+    
+    if((temp > 14) && (temp < 100)) {
+        /* SpO2é‡‡æ ·é¢‘ç‡200Hzï¼ŒFIFOé‡‡æ ·å¹³å‡è®¾ç½®å€¼ä¸º4ï¼Œæ‰€ä»¥å®é™…é‡‡é›†é‡‡æ ·é¢‘ç‡çº¦ä¸º50Hz */
+        return 3000 / temp;  /* è®¡ç®—ä¸€æ¬¡çš„é—´éš”æ˜¯0.02sï¼Œtempæ˜¯ä¸€ä¸ªå¿ƒè·³å‘¨æœŸä¸­çš„é‡‡æ ·æ•°ï¼Œæ‰€ä»¥ä¸€æ¬¡å¿ƒè·³æ˜¯temp/50ç§’,ä¸€åˆ†é’Ÿå¿ƒè·³æ•°æ˜¯60/(temp/50) */
+    } else {
+        return 0;
+    }
 }
 
-float max30102_getSpO2(float *ir_input_data,float *red_input_data,uint16_t cache_nums)
+/**
+  * @brief  è®¡ç®—è¡€æ°§é¥±å’Œåº¦
+  * @param  ir_input_data: IRé€šé“æ•°æ®
+  * @param  red_input_data: REDé€šé“æ•°æ®
+  * @param  cache_nums: æ•°æ®ç‚¹æ•°é‡
+  * @retval è¡€æ°§å€¼ (%)
+  */
+float max30102_getSpO2(float *ir_input_data, float *red_input_data, uint16_t cache_nums)
 {
-			float ir_max=*ir_input_data,ir_min=*ir_input_data;
-			float red_max=*red_input_data,red_min=*red_input_data;
-			float R;
-			uint16_t i;
-			for(i=1;i<cache_nums;i++)
-			{
-				if(ir_max<*(ir_input_data+i))
-				{
-					ir_max=*(ir_input_data+i);
-				}
-				if(ir_min>*(ir_input_data+i))
-				{
-					ir_min=*(ir_input_data+i);
-				}
-				if(red_max<*(red_input_data+i))
-				{
-					red_max=*(red_input_data+i);
-				}
-				if(red_min>*(red_input_data+i))
-				{
-					red_min=*(red_input_data+i);
-				}
-			}
-			R=((ir_max-ir_min)*red_min)/((red_max-red_min)*ir_min);
-//			 R=((ir_max+ir_min)*(red_max-red_min))/((red_max+red_min)*(ir_max-ir_min));
-			return ((-45.060)*R*R + 30.354*R + 94.845);
+    float ir_max = *ir_input_data, ir_min = *ir_input_data;
+    float red_max = *red_input_data, red_min = *red_input_data;
+    float R;
+    uint16_t i;
+    
+    for(i = 1; i < cache_nums; i++) {
+        if(ir_max < *(ir_input_data + i)) {
+            ir_max = *(ir_input_data + i);
+        }
+        if(ir_min > *(ir_input_data + i)) {
+            ir_min = *(ir_input_data + i);
+        }
+        if(red_max < *(red_input_data + i)) {
+            red_max = *(red_input_data + i);
+        }
+        if(red_min > *(red_input_data + i)) {
+            red_min = *(red_input_data + i);
+        }
+    }
+    
+    R = ((ir_max - ir_min) * red_min) / ((red_max - red_min) * ir_min);
+    return ((-45.060) * R * R + 30.354 * R + 94.845);
 }

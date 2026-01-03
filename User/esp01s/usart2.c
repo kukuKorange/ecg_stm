@@ -1,7 +1,7 @@
-#define USE_STDPERIPH_DRIVER
+#ifdef USE_STDPERIPH_DRIVER
 
 #include "stm32f10x.h"
-#include "stm32f10x_rcc.h"     // °üº¬ RCC ÍâÉè¶¨Òå
+#include "stm32f10x_rcc.h"     // ï¿½ï¿½ï¿½ï¿½ RCC ï¿½ï¿½ï¿½è¶¨ï¿½ï¿½
 #include "stm32f10x_usart.h"
 #include "sys.h"
 
@@ -10,110 +10,110 @@
 #include "stdio.h"	 	 
 #include "string.h"
 //////////////////////////////////////////////////////////////////////////////////	   
-//±¾³ÌÐòÖ»¹©Ñ§Ï°Ê¹ÓÃ£¬Î´¾­×÷ÕßÐí¿É£¬²»µÃÓÃÓÚÆäËüÈÎºÎÓÃÍ¾
-//ALIENTEK¾«Ó¢STM32¿ª·¢°åV3
-//´®¿Ú3³õÊ¼»¯´úÂë
-//ÕýµãÔ­×Ó@ALIENTEK
-//¼¼ÊõÂÛÌ³:www.openedv.com
-//ÐÞ¸ÄÈÕÆÚ:2015/3/14
-//°æ±¾£ºV1.0
-//°æÈ¨ËùÓÐ£¬µÁ°æ±Ø¾¿¡£
-//Copyright(C) ¹ãÖÝÊÐÐÇÒíµç×Ó¿Æ¼¼ÓÐÏÞ¹«Ë¾ 2014-2024
+//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö»ï¿½ï¿½Ñ§Ï°Ê¹ï¿½Ã£ï¿½Î´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½É£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Îºï¿½ï¿½ï¿½Í¾
+//ALIENTEKï¿½ï¿½Ó¢STM32ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½V3
+//ï¿½ï¿½ï¿½ï¿½3ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+//ï¿½ï¿½ï¿½ï¿½Ô­ï¿½ï¿½@ALIENTEK
+//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ì³:www.openedv.com
+//ï¿½Þ¸ï¿½ï¿½ï¿½ï¿½ï¿½:2015/3/14
+//ï¿½æ±¾ï¿½ï¿½V1.0
+//ï¿½ï¿½È¨ï¿½ï¿½ï¿½Ð£ï¿½ï¿½ï¿½ï¿½ï¿½Ø¾ï¿½ï¿½ï¿½
+//Copyright(C) ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ó¿Æ¼ï¿½ï¿½ï¿½ï¿½Þ¹ï¿½Ë¾ 2014-2024
 //All rights reserved
 //********************************************************************************
-//ÐÞ¸ÄËµÃ÷
-//ÎÞ
+//ï¿½Þ¸ï¿½Ëµï¿½ï¿½
+//ï¿½ï¿½
 ////////////////////////////////////////////////////////////////////////////////// 	
 
-//´®¿Ú·¢ËÍ»º´æÇø
-__align(8) uint8_t USART2_TX_BUF[USART2_MAX_SEND_LEN]; 	//·¢ËÍ»º³å,×î´óUSART2_MAX_SEND_LEN×Ö½Ú 
-//´®¿Ú½ÓÊÕ»º´æÇø
-uint8_t USART2_RX_BUF[USART2_MAX_RECV_LEN]; 				//½ÓÊÕ»º³å,×î´óUSART2_MAX_RECV_LEN¸ö×Ö½Ú.
+//ï¿½ï¿½ï¿½Ú·ï¿½ï¿½Í»ï¿½ï¿½ï¿½ï¿½ï¿½
+__align(8) uint8_t USART2_TX_BUF[USART2_MAX_SEND_LEN]; 	//ï¿½ï¿½ï¿½Í»ï¿½ï¿½ï¿½,ï¿½ï¿½ï¿½USART2_MAX_SEND_LENï¿½Ö½ï¿½ 
+//ï¿½ï¿½ï¿½Ú½ï¿½ï¿½Õ»ï¿½ï¿½ï¿½ï¿½ï¿½
+uint8_t USART2_RX_BUF[USART2_MAX_RECV_LEN]; 				//ï¿½ï¿½ï¿½Õ»ï¿½ï¿½ï¿½,ï¿½ï¿½ï¿½USART2_MAX_RECV_LENï¿½ï¿½ï¿½Ö½ï¿½.
 
-//ÔÚÅäÖÃÄ£Ê½ÏÂ£º timer=10ms
-//Í¨¹ýÅÐ¶Ï½ÓÊÕÁ¬Ðø2¸ö×Ö·ûÖ®¼äµÄÊ±¼ä²î²»´óÓÚtimerÀ´¾ö¶¨ÊÇ²»ÊÇÒ»´ÎÁ¬ÐøµÄÊý¾Ý.
-//Èç¹û2¸ö×Ö·û½ÓÊÕ¼ä¸ô³¬¹ýtimer,ÔòÈÏÎª²»ÊÇ1´ÎÁ¬ÐøÊý¾Ý.Ò²¾ÍÊÇ³¬¹ýtimerÃ»ÓÐ½ÓÊÕµ½
-//ÈÎºÎÊý¾Ý,Ôò±íÊ¾´Ë´Î½ÓÊÕÍê±Ï.
-//½ÓÊÕµ½µÄÊý¾Ý×´Ì¬
-//[15]:0,Ã»ÓÐ½ÓÊÕµ½Êý¾Ý;1,½ÓÊÕµ½ÁËÒ»ÅúÊý¾Ý.
-//[14:0]:½ÓÊÕµ½µÄÊý¾Ý³¤¶È
+//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä£Ê½ï¿½Â£ï¿½ timer=10ms
+//Í¨ï¿½ï¿½ï¿½Ð¶Ï½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½2ï¿½ï¿½ï¿½Ö·ï¿½Ö®ï¿½ï¿½ï¿½Ê±ï¿½ï¿½î²»ï¿½ï¿½ï¿½ï¿½timerï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç²ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½.
+//ï¿½ï¿½ï¿½2ï¿½ï¿½ï¿½Ö·ï¿½ï¿½ï¿½ï¿½Õ¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½timer,ï¿½ï¿½ï¿½ï¿½Îªï¿½ï¿½ï¿½ï¿½1ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½.Ò²ï¿½ï¿½ï¿½Ç³ï¿½ï¿½ï¿½timerÃ»ï¿½Ð½ï¿½ï¿½Õµï¿½
+//ï¿½Îºï¿½ï¿½ï¿½ï¿½ï¿½,ï¿½ï¿½ï¿½Ê¾ï¿½Ë´Î½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½.
+//ï¿½ï¿½ï¿½Õµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×´Ì¬
+//[15]:0,Ã»ï¿½Ð½ï¿½ï¿½Õµï¿½ï¿½ï¿½ï¿½ï¿½;1,ï¿½ï¿½ï¿½Õµï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½.
+//[14:0]:ï¿½ï¿½ï¿½Õµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý³ï¿½ï¿½ï¿½
 uint16_t USART2_RX_STA = 0;
-//³õÊ¼»¯IO ´®¿Ú3
-//pclk1:PCLK1Ê±ÖÓÆµÂÊ(Mhz)
-//bound:²¨ÌØÂÊ 
+//ï¿½ï¿½Ê¼ï¿½ï¿½IO ï¿½ï¿½ï¿½ï¿½3
+//pclk1:PCLK1Ê±ï¿½ï¿½Æµï¿½ï¿½(Mhz)
+//bound:ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 
 void usart2_init(uint32_t bound)
 {  	 
 	NVIC_InitTypeDef NVIC_InitStructure;
 	GPIO_InitTypeDef GPIO_InitStructure;
 	USART_InitTypeDef USART_InitStructure;
 
-	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);	// GPIOAÊ±ÖÓ
-	RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2,ENABLE); //´®¿Ú2Ê±ÖÓÊ¹ÄÜ
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);	// GPIOAÊ±ï¿½ï¿½
+	RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2,ENABLE); //ï¿½ï¿½ï¿½ï¿½2Ê±ï¿½ï¿½Ê¹ï¿½ï¿½
 
 		 //USART2_TX   PA2
 	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_2; //PA2
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;	//¸´ÓÃÍÆÍìÊä³ö
-	GPIO_Init(GPIOA, &GPIO_InitStructure); //³õÊ¼»¯PA2
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;	//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+	GPIO_Init(GPIOA, &GPIO_InitStructure); //ï¿½ï¿½Ê¼ï¿½ï¿½PA2
    
     //USART2_RX	  PA3
 	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_3;
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;//¸¡¿ÕÊäÈë
-	GPIO_Init(GPIOA, &GPIO_InitStructure);  //³õÊ¼»¯PA3
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+	GPIO_Init(GPIOA, &GPIO_InitStructure);  //ï¿½ï¿½Ê¼ï¿½ï¿½PA3
 	
-	//ÉèÖÃÖÐ¶ÏÓÅÏÈ¼¶
+	//ï¿½ï¿½ï¿½ï¿½ï¿½Ð¶ï¿½ï¿½ï¿½ï¿½È¼ï¿½
 	NVIC_InitStructure.NVIC_IRQChannel = USART2_IRQn;
-	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority=3 ;//ÇÀÕ¼ÓÅÏÈ¼¶3
-	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 3;		//×ÓÓÅÏÈ¼¶3
-	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;			//IRQÍ¨µÀÊ¹ÄÜ
-	NVIC_Init(&NVIC_InitStructure);	//¸ù¾ÝÖ¸¶¨µÄ²ÎÊý³õÊ¼»¯VIC¼Ä´æÆ÷
+	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority=3 ;//ï¿½ï¿½Õ¼ï¿½ï¿½ï¿½È¼ï¿½3
+	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 3;		//ï¿½ï¿½ï¿½ï¿½ï¿½È¼ï¿½3
+	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;			//IRQÍ¨ï¿½ï¿½Ê¹ï¿½ï¿½
+	NVIC_Init(&NVIC_InitStructure);	//ï¿½ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½ï¿½Ä²ï¿½ï¿½ï¿½ï¿½ï¿½Ê¼ï¿½ï¿½VICï¿½Ä´ï¿½ï¿½ï¿½
 	
-	   //USART2 ³õÊ¼»¯ÉèÖÃ
-	USART_InitStructure.USART_BaudRate = bound;//²¨ÌØÂÊÉèÖÃ
-	USART_InitStructure.USART_WordLength = USART_WordLength_8b;//×Ö³¤Îª8Î»Êý¾Ý¸ñÊ½
-	USART_InitStructure.USART_StopBits = USART_StopBits_1;//Ò»¸öÍ£Ö¹Î»
-	USART_InitStructure.USART_Parity = USART_Parity_No;//ÎÞÆæÅ¼Ð£ÑéÎ»
-	USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;//ÎÞÓ²¼þÊý¾ÝÁ÷¿ØÖÆ
-	USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;	//ÊÕ·¢Ä£Ê½
+	   //USART2 ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+	USART_InitStructure.USART_BaudRate = bound;//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+	USART_InitStructure.USART_WordLength = USART_WordLength_8b;//ï¿½Ö³ï¿½Îª8Î»ï¿½ï¿½ï¿½Ý¸ï¿½Ê½
+	USART_InitStructure.USART_StopBits = USART_StopBits_1;//Ò»ï¿½ï¿½Í£Ö¹Î»
+	USART_InitStructure.USART_Parity = USART_Parity_No;//ï¿½ï¿½ï¿½ï¿½Å¼Ð£ï¿½ï¿½Î»
+	USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;//ï¿½ï¿½Ó²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+	USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;	//ï¿½Õ·ï¿½Ä£Ê½
   
-	USART_Init(USART2, &USART_InitStructure); //³õÊ¼»¯´®¿Ú	2
-  USART_ITConfig(USART2, USART_IT_RXNE, ENABLE);//¿ªÆôÖÐ¶Ï   
-	USART_Cmd(USART2, ENABLE);                    //Ê¹ÄÜ´®¿Ú 
+	USART_Init(USART2, &USART_InitStructure); //ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½	2
+  USART_ITConfig(USART2, USART_IT_RXNE, ENABLE);//ï¿½ï¿½ï¿½ï¿½ï¿½Ð¶ï¿½   
+	USART_Cmd(USART2, ENABLE);                    //Ê¹ï¿½Ü´ï¿½ï¿½ï¿½ 
   
 }
 
-#ifdef USART2_RX_EN   								//Èç¹ûÊ¹ÄÜÁË½ÓÊÕ
+#ifdef USART2_RX_EN   								//ï¿½ï¿½ï¿½Ê¹ï¿½ï¿½ï¿½Ë½ï¿½ï¿½ï¿½
 void USART2_IRQHandler(void)
 {
 	uint8_t Res;
-	if(USART_GetITStatus(USART2, USART_IT_RXNE) != RESET)  //½ÓÊÕÖÐ¶Ï£¨½ÓÊÕµ½µÄÊý¾Ý±ØÐëÊÇ0x0d  0x0a½áÎ²£©
+	if(USART_GetITStatus(USART2, USART_IT_RXNE) != RESET)  //ï¿½ï¿½ï¿½ï¿½ï¿½Ð¶Ï£ï¿½ï¿½ï¿½ï¿½Õµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý±ï¿½ï¿½ï¿½ï¿½ï¿½0x0d  0x0aï¿½ï¿½Î²ï¿½ï¿½
 	{
-		Res =USART_ReceiveData(USART2);//(USART1->DR);	//¶ÁÈ¡½ÓÊÕµ½µÄÊý¾Ý
+		Res =USART_ReceiveData(USART2);//(USART1->DR);	//ï¿½ï¿½È¡ï¿½ï¿½ï¿½Õµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 		
-		if((USART2_RX_STA&0x8000)==0)//½ÓÊÕÎ´Íê³É
+		if((USART2_RX_STA&0x8000)==0)//ï¿½ï¿½ï¿½ï¿½Î´ï¿½ï¿½ï¿½
 		{
-			if(USART2_RX_STA&0x4000)//½ÓÊÕµ½ÁË0x0d
+			if(USART2_RX_STA&0x4000)//ï¿½ï¿½ï¿½Õµï¿½ï¿½ï¿½0x0d
 			{
-				if(Res!=0x0a)USART2_RX_STA=0;//½ÓÊÕ´íÎó£¬ÖØÐÂ¿ªÊ¼
-				else USART2_RX_STA|=0x8000;	//½ÓÊÕÍê³ÉÁË
+				if(Res!=0x0a)USART2_RX_STA=0;//ï¿½ï¿½ï¿½Õ´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Â¿ï¿½Ê¼
+				else USART2_RX_STA|=0x8000;	//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 			}
-			else //Ã»ÊÕµ½0X0D
+			else //Ã»ï¿½Õµï¿½0X0D
 			{	
 				if(Res==0x0d)USART2_RX_STA|=0x4000;
 				else
 				{
 					USART2_RX_BUF[USART2_RX_STA&0X3FFF]=Res ;
 					USART2_RX_STA++;
-					if(USART2_RX_STA>(USART2_MAX_RECV_LEN-1))USART2_RX_STA=0;//½ÓÊÕÊý¾Ý´íÎó£¬ÖØÐÂ¿ªÊ¼½ÓÊÕ
+					if(USART2_RX_STA>(USART2_MAX_RECV_LEN-1))USART2_RX_STA=0;//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Â¿ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½
 				}		 
 			}
 		}
 	}
 }   
 #endif
-
-//´®¿Ú2,printf º¯Êý
-//È·±£Ò»´Î·¢ËÍÊý¾Ý²»³¬¹ýUSART2_MAX_SEND_LEN×Ö½Ú
+#endif
+//ï¿½ï¿½ï¿½ï¿½2,printf ï¿½ï¿½ï¿½ï¿½
+//È·ï¿½ï¿½Ò»ï¿½Î·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý²ï¿½ï¿½ï¿½ï¿½ï¿½USART2_MAX_SEND_LENï¿½Ö½ï¿½
 void u2_printf(char *fmt, ...)
 {
     uint16_t i, j;
@@ -121,13 +121,13 @@ void u2_printf(char *fmt, ...)
     va_start(ap, fmt);
     vsprintf((char *)USART2_TX_BUF, fmt, ap);
     va_end(ap);
-    i = strlen((const char *)USART2_TX_BUF);                  //´Ë´Î·¢ËÍÊý¾ÝµÄ³¤¶È
+    i = strlen((const char *)USART2_TX_BUF);                  //ï¿½Ë´Î·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ÝµÄ³ï¿½ï¿½ï¿½
 
-    for (j = 0; j < i; j++)                                   //Ñ­»··¢ËÍÊý¾Ý
+    for (j = 0; j < i; j++)                                   //Ñ­ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     {
-        while (USART_GetFlagStatus(USART2, USART_FLAG_TC) == RESET); //µÈ´ýÉÏ´Î´«ÊäÍê³É
+        while (USART_GetFlagStatus(USART2, USART_FLAG_TC) == RESET); //ï¿½È´ï¿½ï¿½Ï´Î´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 
-        USART_SendData(USART2, (uint8_t)USART2_TX_BUF[j]); 	 //·¢ËÍÊý¾Ýµ½´®¿Ú2
+        USART_SendData(USART2, (uint8_t)USART2_TX_BUF[j]); 	 //ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ýµï¿½ï¿½ï¿½ï¿½ï¿½2
     }
 
 }

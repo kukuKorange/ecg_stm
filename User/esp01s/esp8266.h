@@ -1,18 +1,18 @@
 #ifndef	__ESP8266_H
 #define	__ESP8266_H
 
-#define USE_STDPERIPH_DRIVER
+#ifdef USE_STDPERIPH_DRIVER
 
 #include "stdint.h"
 #include "string.h"
-#undef USE_HAL_DRIVER  // ½ûÓÃHAL
-/*MQTT Á¬½Ó²ÎÊý*/
+#undef USE_HAL_DRIVER  // ï¿½ï¿½ï¿½ï¿½HAL
+/*MQTT ï¿½ï¿½ï¿½Ó²ï¿½ï¿½ï¿½*/
 //#define clientId "a1Zw81YmcId.ESP8266|securemode=2\\,signmethod=hmacsha256\\,timestamp=1694524012615|"
 //#define username "ESP8266&a1Zw81YmcId"
 //#define passwd "a8bed5d35c6c689437c6ef2fa8d360044879460f6e6647fb4b8f985180ad42ca"
 //#define mqttHostUrl "a1Zw81YmcId.iot-as-mqtt.cn-shanghai.aliyuncs.com"
 //#define port "1883"
-//¿Í»§
+//ï¿½Í»ï¿½
 #define post "/k16e93sVlLN/esp01s/user/esp01s"
 #define post_name "LightSwitch"
 
@@ -26,7 +26,7 @@
 
 #define WIFI_Name "5132"
 #define WIFI_Pass "53288837"
-extern unsigned char Property_Data[];		//Êý¾Ý±£´æÊý×é
+extern unsigned char Property_Data[];		//ï¿½ï¿½ï¿½Ý±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 void ESP8266_Init(void);
 unsigned char ESP8266_Re(unsigned char *ACK_AT);
 void ESP8266_Send(char *property,int Data);
@@ -36,4 +36,4 @@ uint8_t esp8266_check_cmd(char *str);
 //void delay_ms_01s(uint16_t ms);
 
 #endif
-
+#endif

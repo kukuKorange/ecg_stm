@@ -8,7 +8,7 @@ void ChartOptimize(uint16_t *R,uint16_t *Chart);
 void AD8232Init(void);
 uint8_t GetConnect(void);
 uint8_t GetHeartRate(uint16_t *array, uint16_t length);
-float Lowpass(float X_last, float X_new, float K);
+// float Lowpass(float X_last, float X_new, float K);
 
 #endif
 

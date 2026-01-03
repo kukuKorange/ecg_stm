@@ -1,5 +1,4 @@
-
-#define USE_STDPERIPH_DRIVER
+#ifdef USE_STDPERIPH_DRIVER
 
 #include "timer2.h"
 #include "stm32f10x.h"                  // Device header
@@ -87,7 +86,7 @@ void TIM3_IRQHandler(void) //1000hz
 				t[i]=90-AD_GetValue()/45;    //心率测试
 //				t[i] = 55-AD_GetValue()/95;
 				t[0] = t[1];
-				t[i] = Lowpass(t[i - 1],t[i],0.25);     //心率测试
+				t[i] = (t[i - 1] + (t[i] - t[i - 1]) * 0.25);     //心率测试
 				OLED_DrawLine(j + 3,t[i - 1],j + 4,t[i]);
 //				OLED_Update();
 				i++;
@@ -115,3 +114,4 @@ void TIM3_IRQHandler(void) //1000hz
 		TIM_ClearITPendingBit(TIM3, TIM_IT_Update);
 	}
 }
+#endif

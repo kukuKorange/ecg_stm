@@ -1,8 +1,7 @@
-
-#define USE_STDPERIPH_DRIVER
+#ifdef USE_STDPERIPH_DRIVER
 
 #include "stm32f10x.h"
-#include "stm32f10x_rcc.h"     // °üº¬ RCC ÍâÉè¶¨Òå
+#include "stm32f10x_rcc.h"     // ï¿½ï¿½ï¿½ï¿½ RCC ï¿½ï¿½ï¿½è¶¨ï¿½ï¿½
 #include "esp8266.h"
 #include "usart2.h"
 #include "string.h"
@@ -10,53 +9,53 @@
 #include "stdint.h"
 //#include "sys.h"
 
-#undef USE_HAL_DRIVER  // ½ûÓÃHAL
+#undef USE_HAL_DRIVER  // ï¿½ï¿½ï¿½ï¿½HAL
 
-unsigned char Property_Data[5];		//Êý¾Ý±£´æÊý×é
+unsigned char Property_Data[5];		//ï¿½ï¿½ï¿½Ý±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 /*****************************************************
-*º¯ÊýÃû³Æ£ºvoid ESP8266_Init(void)
-*º¯Êý¹¦ÄÜ£ºESP8266²ÎÊý³õÊ¼»¯
-*Èë¿Ú²ÎÊý£ºvoid
-*³ö¿Ú²ÎÊý£ºvoid
+*ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ£ï¿½void ESP8266_Init(void)
+*ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ü£ï¿½ESP8266ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê¼ï¿½ï¿½
+*ï¿½ï¿½Ú²ï¿½ï¿½ï¿½ï¿½ï¿½void
+*ï¿½ï¿½ï¿½Ú²ï¿½ï¿½ï¿½ï¿½ï¿½void
 *****************************************************/
 
 
-//static uint32_t fac_ms=72000;							//msÑÓÊ±±¶³ËÊý,ÔÚucosÏÂ,´ú±íÃ¿¸ö½ÚÅÄµÄmsÊý
+//static uint32_t fac_ms=72000;							//msï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½,ï¿½ï¿½ucosï¿½ï¿½,ï¿½ï¿½ï¿½ï¿½Ã¿ï¿½ï¿½ï¿½ï¿½ï¿½Äµï¿½msï¿½ï¿½
 
 void delay_ms_01s(uint16_t ms)
 {	
-		SysTick->LOAD = (SystemCoreClock / 1000) - 1;  // ¶¯Ì¬¼ÆËã
+		SysTick->LOAD = (SystemCoreClock / 1000) - 1;  // ï¿½ï¿½Ì¬ï¿½ï¿½ï¿½ï¿½
     SysTick->VAL = 0;
     SysTick->CTRL = SysTick_CTRL_ENABLE_Msk | SysTick_CTRL_CLKSOURCE_Msk;
     
     while (ms--) {
         while (!(SysTick->CTRL & SysTick_CTRL_COUNTFLAG_Msk));
-        SysTick->CTRL &= ~SysTick_CTRL_COUNTFLAG_Msk;  // Çå³ý±êÖ¾
+        SysTick->CTRL &= ~SysTick_CTRL_COUNTFLAG_Msk;  // ï¿½ï¿½ï¿½ï¿½ï¿½Ö¾
     }
-    SysTick->CTRL = 0;  // ¹Ø±Õ¶¨Ê±Æ÷    
+    SysTick->CTRL = 0;  // ï¿½Ø±Õ¶ï¿½Ê±ï¿½ï¿½    
 } 
 
 void ESP8266_Init(void)
 {
-	esp8266_send_cmd("AT+CWMODE=1","OK",50);	//ÅäÖÃWiFi¹¤×÷Ä£Ê½ÎªStationÄ£Ê½:¾ÍÊÇESP8266Ä£¿éÈ¥Á¬½Ó×Ô¼º¼ÒµÄwifi,
-															//ÊÖ»úÒ²Á¬½Ó×Ô¼º¼ÒµÄwifiÈ»ºóÊµÏÖÁËÊÖ»úºÍWiFiÄ£¿éµÄÍ¨ÐÅ,(×Ô¼º¼ÒwifiÏàµ±ÓÚÒ»¸öÖÐ½é)
-	//ÈÃWifiÄ£¿éÖØÆôµÄÃüÁî
+	esp8266_send_cmd("AT+CWMODE=1","OK",50);	//ï¿½ï¿½ï¿½ï¿½WiFiï¿½ï¿½ï¿½ï¿½Ä£Ê½ÎªStationÄ£Ê½:ï¿½ï¿½ï¿½ï¿½ESP8266Ä£ï¿½ï¿½È¥ï¿½ï¿½ï¿½ï¿½ï¿½Ô¼ï¿½ï¿½Òµï¿½wifi,
+															//ï¿½Ö»ï¿½Ò²ï¿½ï¿½ï¿½ï¿½ï¿½Ô¼ï¿½ï¿½Òµï¿½wifiÈ»ï¿½ï¿½Êµï¿½ï¿½ï¿½ï¿½ï¿½Ö»ï¿½ï¿½ï¿½WiFiÄ£ï¿½ï¿½ï¿½Í¨ï¿½ï¿½,(ï¿½Ô¼ï¿½ï¿½ï¿½wifiï¿½àµ±ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Ð½ï¿½)
+	//ï¿½ï¿½WifiÄ£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	esp8266_send_cmd("AT+RST","ready",20);
 	delay_ms_01s(1000);
 
-	//ÈÃÄ£¿éÁ¬½ÓÉÏ×Ô¼ºµÄÂ·ÓÉ
+	//ï¿½ï¿½Ä£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô¼ï¿½ï¿½ï¿½Â·ï¿½ï¿½
 	esp8266_send_cmd("AT+CWJAP=\"5132\",\"53288837\"","WIFI GOT IP",300);
-	//AT+MQTTUSERCFG - ÅäÖÃ MQTT ÓÃ»§ÊôÐÔ
+	//AT+MQTTUSERCFG - ï¿½ï¿½ï¿½ï¿½ MQTT ï¿½Ã»ï¿½ï¿½ï¿½ï¿½ï¿½
 	esp8266_send_cmd(MQTT_set,"OK",100);
-	//ÅäÖÃ MQTT ¿Í»§¶Ë ID
+	//ï¿½ï¿½ï¿½ï¿½ MQTT ï¿½Í»ï¿½ï¿½ï¿½ ID
 	esp8266_send_cmd(MQTT_Client,"OK",100);
-	//Á¬½ÓÖ¸¶¨ MQTTÐ­Òé
+	//ï¿½ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½ MQTTÐ­ï¿½ï¿½
 	esp8266_send_cmd(MQTT_Pass,"OK",300);
 }
 
-//ÏòESP8266·¢ËÍÃüÁî
-//cmd:·¢ËÍµÄÃüÁî×Ö·û´®;ack:ÆÚ´ýµÄÓ¦´ð½á¹û,Èç¹ûÎª¿Õ,Ôò±íÊ¾²»ÐèÒªµÈ´ýÓ¦´ð;waittime:µÈ´ýÊ±¼ä(µ¥Î»:10ms)
-//·µ»ØÖµ:0,·¢ËÍ³É¹¦(µÃµ½ÁËÆÚ´ýµÄÓ¦´ð½á¹û);1,·¢ËÍÊ§°Ü
+//ï¿½ï¿½ESP8266ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+//cmd:ï¿½ï¿½ï¿½Íµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö·ï¿½ï¿½ï¿½;ack:ï¿½Ú´ï¿½ï¿½ï¿½Ó¦ï¿½ï¿½ï¿½ï¿½,ï¿½ï¿½ï¿½Îªï¿½ï¿½,ï¿½ï¿½ï¿½Ê¾ï¿½ï¿½ï¿½ï¿½Òªï¿½È´ï¿½Ó¦ï¿½ï¿½;waittime:ï¿½È´ï¿½Ê±ï¿½ï¿½(ï¿½ï¿½Î»:10ms)
+//ï¿½ï¿½ï¿½ï¿½Öµ:0,ï¿½ï¿½ï¿½Í³É¹ï¿½(ï¿½Ãµï¿½ï¿½ï¿½ï¿½Ú´ï¿½ï¿½ï¿½Ó¦ï¿½ï¿½ï¿½ï¿½);1,ï¿½ï¿½ï¿½ï¿½Ê§ï¿½ï¿½
 uint8_t esp8266_send_cmd(char *cmd,char *ack,uint16_t waittime)
 {
 	uint8_t res=0; 
@@ -81,16 +80,16 @@ uint8_t esp8266_send_cmd(char *cmd,char *ack,uint16_t waittime)
 	}
 	return res;
 } 
-//ESP8266·¢ËÍÃüÁîºó,¼ì²â½ÓÊÕµ½µÄÓ¦´ð
-//str:ÆÚ´ýµÄÓ¦´ð½á¹û
-//·µ»ØÖµ:0,Ã»ÓÐµÃµ½ÆÚ´ýµÄÓ¦´ð½á¹û;ÆäËû,ÆÚ´ýÓ¦´ð½á¹ûµÄÎ»ÖÃ(strµÄÎ»ÖÃ)
+//ESP8266ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½,ï¿½ï¿½ï¿½ï¿½ï¿½Õµï¿½ï¿½ï¿½Ó¦ï¿½ï¿½
+//str:ï¿½Ú´ï¿½ï¿½ï¿½Ó¦ï¿½ï¿½ï¿½ï¿½
+//ï¿½ï¿½ï¿½ï¿½Öµ:0,Ã»ï¿½ÐµÃµï¿½ï¿½Ú´ï¿½ï¿½ï¿½Ó¦ï¿½ï¿½ï¿½ï¿½;ï¿½ï¿½ï¿½ï¿½,ï¿½Ú´ï¿½Ó¦ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Î»ï¿½ï¿½(strï¿½ï¿½Î»ï¿½ï¿½)
 
 uint8_t esp8266_check_cmd(char *str)
 {
 	char *strx = NULL;
-	if(USART2_RX_STA&0X8000)		//½ÓÊÕµ½Ò»´ÎÊý¾ÝÁË
+	if(USART2_RX_STA&0X8000)		//ï¿½ï¿½ï¿½Õµï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	{ 
-		USART2_RX_BUF[USART2_RX_STA&0X7FFF]=0;//Ìí¼Ó½áÊø·û
+		USART2_RX_BUF[USART2_RX_STA&0X7FFF]=0;//ï¿½ï¿½ï¿½Ó½ï¿½ï¿½ï¿½ï¿½ï¿½
 		strx = strstr((const char*)USART2_RX_BUF,(const char*)str);
 	} 
 	
@@ -105,10 +104,10 @@ uint8_t esp8266_check_cmd(char *str)
 }
 
 /*****************************************************
-*º¯ÊýÃû³Æ£ºESP8266_Send(char *property,int Data)
-*º¯Êý¹¦ÄÜ£ºÏòÔÆ¶Ë·¢ËÍÊý¾Ý
-*Èë¿Ú²ÎÊý£ºchar *property,int Data £¨ÊôÐÔ£©£¨Êý¾Ý£©
-*³ö¿Ú²ÎÊý£ºvoid
+*ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ£ï¿½ESP8266_Send(char *property,int Data)
+*ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ü£ï¿½ï¿½ï¿½ï¿½Æ¶Ë·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+*ï¿½ï¿½Ú²ï¿½ï¿½ï¿½ï¿½ï¿½char *property,int Data ï¿½ï¿½ï¿½ï¿½ï¿½Ô£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý£ï¿½
+*ï¿½ï¿½ï¿½Ú²ï¿½ï¿½ï¿½ï¿½ï¿½void
 *****************************************************/
 void ESP8266_Send(char *property,int Data)
 {
@@ -117,10 +116,10 @@ void ESP8266_Send(char *property,int Data)
 }
 
 /*****************************************************
-*º¯ÊýÃû³Æ£ºESP8266_Received(void)
-*º¯Êý¹¦ÄÜ£ºÔÆ¶Ë½ÓÊÕÊý¾Ý
-*Èë¿Ú²ÎÊý£ºchar *property,int Data £¨ÊôÐÔ£©£¨Êý¾Ý£©
-*³ö¿Ú²ÎÊý£ºvoid
+*ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ£ï¿½ESP8266_Received(void)
+*ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ü£ï¿½ï¿½Æ¶Ë½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+*ï¿½ï¿½Ú²ï¿½ï¿½ï¿½ï¿½ï¿½char *property,int Data ï¿½ï¿½ï¿½ï¿½ï¿½Ô£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý£ï¿½
+*ï¿½ï¿½ï¿½Ú²ï¿½ï¿½ï¿½ï¿½ï¿½void
 *****************************************************/
 void ESP8266_Received(char *PRO)
 {
@@ -128,7 +127,7 @@ void ESP8266_Received(char *PRO)
 	char *property = 0;
 	unsigned char i;
 	if(PRO == NULL);
-	else if(USART2_RX_STA&0x8000)			//´®¿Ú2½ÓÊÕÍêÒ»Ö¡Êý¾Ý
+	else if(USART2_RX_STA&0x8000)			//ï¿½ï¿½ï¿½ï¿½2ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»Ö¡ï¿½ï¿½ï¿½ï¿½
 	{
 		ret = USART2_RX_BUF;
 		if(ret!=0)
@@ -158,3 +157,4 @@ void ESP8266_Received(char *PRO)
 		}
 	}
 }
+#endif
