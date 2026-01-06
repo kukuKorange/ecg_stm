@@ -61,10 +61,10 @@ static uint8_t I2C_WaitFlag(uint32_t I2C_FLAG, FlagStatus Status)
 
 /**
   * @brief  I2C主机初始化
-  */
+*/
 void I2cMaster_Init(void)
 {
-    GPIO_InitTypeDef GPIO_InitStructure;
+	GPIO_InitTypeDef GPIO_InitStructure;
     I2C_InitTypeDef I2C_InitStructure;
 
     /* 使能GPIO时钟 */
@@ -82,7 +82,7 @@ void I2cMaster_Init(void)
     /* 配置I2C引脚: SDA */
     GPIO_InitStructure.GPIO_Pin = SENSORS_I2C_SDA_GPIO_PIN;
     GPIO_Init(SENSORS_I2C_SDA_GPIO_PORT, &GPIO_InitStructure);
-
+	
     /* I2C复位 */
     I2C_DeInit(SENSORS_I2C);
 

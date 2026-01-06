@@ -23,7 +23,11 @@
 
 /*============================ 私有变量 ============================*/
 
-static uint16_t tim3_counter = 0;   /**< TIM3中断计数器 */
+static uint32_t tim3_counter = 0;   /**< TIM3中断计数器(0-999) */
+
+/*============================ 全局变量 ============================*/
+
+volatile uint32_t tim3_ms_counter = 0;  /**< 毫秒计数器，每1ms加1（用于时间测量） */
 
 /*============================ 函数实现 ============================*/
 
@@ -46,7 +50,7 @@ void Timer3_Init(void)
     TIM_TimeBaseInitStructure.TIM_ClockDivision = TIM_CKD_DIV1;
     TIM_TimeBaseInitStructure.TIM_CounterMode = TIM_CounterMode_Up;
     TIM_TimeBaseInitStructure.TIM_Period = 10 - 1;          /* ARR = 10 */
-    TIM_TimeBaseInitStructure.TIM_Prescaler = 7200 - 1;     /* PSC = 7200 */
+    TIM_TimeBaseInitStructure.TIM_Prescaler = 72 - 1;     /* PSC = 7200 */
     TIM_TimeBaseInitStructure.TIM_RepetitionCounter = 0;
     TIM_TimeBaseInit(TIM3, &TIM_TimeBaseInitStructure);
     
@@ -75,7 +79,7 @@ extern volatile uint8_t debug_refresh_flag;  /**< 调试页面刷新标志 */
 
 /**
   * @brief  TIM3中断服务函数
-  * @note   中断频率: 1000Hz
+  * @note   中断频率: 100000Hz
   *         
   *         任务分配:
   *         - 每1000次(1Hz):  更新测试计数器
@@ -87,9 +91,10 @@ void TIM3_IRQHandler(void)
     if (TIM_GetITStatus(TIM3, TIM_IT_Update) == SET)
     {
         tim3_counter++;
+        tim3_ms_counter++;  /* 毫秒计数器（用于循环时间测量） */
         
         /* 1Hz任务: 秒计数器 */
-        if (tim3_counter >= 1000)
+        if (tim3_counter >= 100000)
         {
             test++;
             tim3_counter = 0;
@@ -97,14 +102,14 @@ void TIM3_IRQHandler(void)
         
 #ifdef ENABLE_DEBUG_PAGE
         /* 10Hz任务: 调试页面刷新（仅在调试页面执行） */
-        if ((tim3_counter % 100 == 0) && (current_page == PAGE_DEBUG))
+        if ((tim3_counter % 10000 == 0) && (current_page == PAGE_DEBUG))
         {
             debug_refresh_flag = 1;
         }
 #endif
         
         /* 200Hz任务: ECG采样与绘制（仅在心电图页面执行） */
-        if ((tim3_counter % 5 == 0) && (current_page == PAGE_ECG))
+        if ((tim3_counter % 500 == 0) && (current_page == PAGE_ECG))
         {
             ECG_SampleAndDraw();
         }

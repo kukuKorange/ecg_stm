@@ -57,6 +57,11 @@ static uint8_t last_page = 0xFF;  /* 上一次的页面，用于检测页面切�
 #ifdef ENABLE_DEBUG_PAGE
 /* 调试页面刷新控制 */
 volatile uint8_t debug_refresh_flag = 0;  /* 调试页面刷新标志（由定时器置位） */
+
+/* 循环时间测量（使用TIM3的1kHz计数器，单位：ms） */
+static uint32_t loop_start_ms = 0;        /* 循环开始时的毫秒数 */
+static uint32_t loop_time_ms = 0;         /* 一次循环时间（毫秒） */
+static uint32_t loop_time_max_ms = 0;     /* 最大循环时间（毫秒） */
 #endif
 
 /**
@@ -74,6 +79,7 @@ int main(void)
     
     /* 初始化系统时钟为72MHz */
     SystemClock_Config();
+    
     
     /* 初始化LED */
     LED_GPIO_Config();
@@ -99,6 +105,11 @@ int main(void)
     
     while(1)
     {
+#ifdef ENABLE_DEBUG_PAGE
+        /* ==================== 记录循环开始时间（使用TIM3的ms计数器） ==================== */
+        loop_start_ms = tim3_ms_counter;
+#endif
+        
         /* ==================== 按键处理 ==================== */
         Key_Process();
         
@@ -107,6 +118,9 @@ int main(void)
         {
             OLED_Clear();
             last_page = current_page;
+#ifdef ENABLE_DEBUG_PAGE
+            loop_time_max_ms = 0;  /* 切换页面时重置最大时间 */
+#endif
         }
         
         /* ==================== 根据当前页面显示内容 ==================== */
@@ -178,6 +192,17 @@ int main(void)
         {
             LED2_OFF
         }
+        
+#ifdef ENABLE_DEBUG_PAGE
+        /* ==================== 计算循环时间（使用TIM3的ms计数器） ==================== */
+        loop_time_ms = tim3_ms_counter - loop_start_ms;
+        
+        /* 更新最大循环时间 */
+        if (loop_time_ms > loop_time_max_ms)
+        {
+            loop_time_max_ms = loop_time_ms;
+        }
+#endif
     }
 }
 
@@ -249,12 +274,12 @@ static void Display_Page1_ECG(void)
  * 
  * @details 显示内容（10Hz刷新）:
  *          ┌────────────────────────┐
- *          │ [DEBUG] 10Hz Refresh   │
+ *          │ [DEBUG] 10Hz           │
  *          │────────────────────────│
- *          │ ADC Raw:  2048         │
- *          │ IR Data:  125000       │
- *          │ RED Data: 118000       │
- *          │ Time: 123s             │
+ *          │ Loop: 1234 ms          │
+ *          │ Max:  5678 ms          │
+ *          │ ADC:  2048   HR: 75    │
+ *          │ Time: 123 s  SpO2: 98  │
  *          │ [<] Page 3/3     [>]   │
  *          └────────────────────────┘
  */
@@ -271,29 +296,28 @@ static void Display_Page2_Debug(void)
     /* 分隔线 */
     OLED_DrawLine(0, 10, 127, 10);
     
-    /* ADC原始值 */
-    OLED_ShowString(0, 14, "ADC:", OLED_6X8);
-    OLED_ShowNum(30, 14, adc_raw, 4, OLED_6X8);
+    /* 循环时间（当前） */
+    OLED_ShowString(0, 14, "Loop:", OLED_6X8);
+    OLED_ShowNum(36, 14, loop_time_ms, 5, OLED_6X8);
+    OLED_ShowString(72, 14, "10ns", OLED_6X8);
     
-    /* IR通道数据 */
-    OLED_ShowString(0, 24, "IR:", OLED_6X8);
-    OLED_ShowNum(24, 24, (uint32_t)ppg_data_cache_IR[0], 6, OLED_6X8);
+    /* 循环时间（最大） */
+    OLED_ShowString(0, 24, "Max:", OLED_6X8);
+    OLED_ShowNum(30, 24, loop_time_max_ms, 5, OLED_6X8);
+    OLED_ShowString(66, 24, "ms", OLED_6X8);
     
-    /* RED通道数据 */
-    OLED_ShowString(0, 34, "RED:", OLED_6X8);
-    OLED_ShowNum(30, 34, (uint32_t)ppg_data_cache_RED[0], 6, OLED_6X8);
+    /* ADC和心率 */
+    OLED_ShowString(0, 34, "ADC:", OLED_6X8);
+    OLED_ShowNum(30, 34, adc_raw, 4, OLED_6X8);
+    OLED_ShowString(80, 34, "HR:", OLED_6X8);
+    OLED_ShowNum(104, 34, HR_new, 3, OLED_6X8);
     
-    /* 运行时间（秒） */
+    /* 运行时间和血氧 */
     OLED_ShowString(0, 44, "Time:", OLED_6X8);
-    OLED_ShowNum(36, 44, test, 5, OLED_6X8);
-    OLED_ShowString(72, 44, "s", OLED_6X8);
-    
-    /* 心率和血氧 */
-    OLED_ShowString(80, 14, "HR:", OLED_6X8);
-    OLED_ShowNum(104, 14, HR_new, 3, OLED_6X8);
-    
-    OLED_ShowString(80, 24, "SpO2:", OLED_6X8);
-    OLED_ShowNum(110, 24, SpO2_value, 3, OLED_6X8);
+    OLED_ShowNum(36, 44, test, 4, OLED_6X8);
+    OLED_ShowString(62, 44, "s", OLED_6X8);
+    OLED_ShowString(80, 44, "SpO2:", OLED_6X8);
+    OLED_ShowNum(110, 44, SpO2_value, 3, OLED_6X8);
     
     /* 页码指示 */
     OLED_ShowString(0, 56, "<K1", OLED_6X8);
