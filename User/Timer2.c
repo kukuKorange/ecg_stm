@@ -67,13 +67,20 @@ void Timer3_Init(void)
     TIM_Cmd(TIM3, ENABLE);
 }
 
+/*============================ 外部变量 ============================*/
+
+#ifdef ENABLE_DEBUG_PAGE
+extern volatile uint8_t debug_refresh_flag;  /**< 调试页面刷新标志 */
+#endif
+
 /**
   * @brief  TIM3中断服务函数
   * @note   中断频率: 1000Hz
   *         
   *         任务分配:
-  *         - 每1000次(1秒): 更新测试计数器
-  *         - 每5次(200Hz): ECG采样与绘制
+  *         - 每1000次(1Hz):  更新测试计数器
+  *         - 每100次(10Hz):  调试页面刷新标志
+  *         - 每5次(200Hz):   ECG采样与绘制
   */
 void TIM3_IRQHandler(void)
 {
@@ -87,6 +94,14 @@ void TIM3_IRQHandler(void)
             test++;
             tim3_counter = 0;
         }
+        
+#ifdef ENABLE_DEBUG_PAGE
+        /* 10Hz任务: 调试页面刷新（仅在调试页面执行） */
+        if ((tim3_counter % 100 == 0) && (current_page == PAGE_DEBUG))
+        {
+            debug_refresh_flag = 1;
+        }
+#endif
         
         /* 200Hz任务: ECG采样与绘制（仅在心电图页面执行） */
         if ((tim3_counter % 5 == 0) && (current_page == PAGE_ECG))
