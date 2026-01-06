@@ -191,3 +191,4 @@ float max30102_getSpO2(float *ir_input_data, float *red_input_data, uint16_t cac
     R = ((ir_max - ir_min) * red_min) / ((red_max - red_min) * ir_min);
     return ((-45.060) * R * R + 30.354 * R + 94.845);
 }
+

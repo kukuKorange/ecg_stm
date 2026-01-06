@@ -26,17 +26,12 @@
 #include "AD.h"
 #include "ad8232.h"
 #include "key.h"
+#include "module/display/display.h"
 
 /* =========================================函数声明区====================================== */
 
 void SystemClock_Config(void);
 static float Lowpass(float X_last, float X_new, float K);
-static void Display_Page0_HeartRate(void);
-static void Display_Page1_ECG(void);
-
-#ifdef ENABLE_DEBUG_PAGE
-static void Display_Page2_Debug(void);
-#endif
 
 /* =========================================变量定义区====================================== */
 /* 注: HR_CACHE_NUMS 和 PPG_DATA_THRESHOLD 已在 kconfig.h 中定义为 HR_CACHE_NUMS 和 PPG_DATA_THRESHOLD */
@@ -57,10 +52,10 @@ static uint8_t last_page = 0xFF;  /* 上一次的页面，用于检测页面切�
 /* 调试页面刷新控制 */
 volatile uint8_t debug_refresh_flag = 0;  /* 调试页面刷新标志（由定时器置位） */
 
-/* 循环时间测量（使用TIM3的1kHz计数器，单位：ms） */
-static uint32_t loop_start_ms = 0;        /* 循环开始时的毫秒数 */
-static uint32_t loop_time_ms = 0;         /* 一次循环时间（毫秒） */
-static uint32_t loop_time_max_ms = 0;     /* 最大循环时间（毫秒） */
+/* 循环时间测量（使用TIM3的100kHz计数器，单位：10us） */
+static uint32_t loop_start_ms = 0;              /* 循环开始时的计数值 */
+uint32_t display_loop_time_ms = 0;              /* 一次循环时间（10us）- 供显示模块使用 */
+uint32_t display_loop_time_max_ms = 0;          /* 最大循环时间（10us）- 供显示模块使用 */
 #endif
 
 /**
@@ -118,7 +113,7 @@ int main(void)
             OLED_Clear();
             last_page = current_page;
 #ifdef ENABLE_DEBUG_PAGE
-            loop_time_max_ms = 0;  /* 切换页面时重置最大时间 */
+            display_loop_time_max_ms = 0;  /* 切换页面时重置最大时间 */
 #endif
         }
         
@@ -178,7 +173,7 @@ int main(void)
                 HR_new = Lowpass(HR_last, max30102_getHeartRate(ppg_data_cache_IR, HR_CACHE_NUMS), 0.6);
                 SpO2_value = max30102_getSpO2(ppg_data_cache_IR, ppg_data_cache_RED, HR_CACHE_NUMS);
                 HR_last = max30102_getHeartRate(ppg_data_cache_IR, HR_CACHE_NUMS);
-                ESP8266_Send("HeartRate", (int)HR_new);
+                // ESP8266_Send("HeartRate", (int)HR_new);
             }
         }
         
@@ -195,139 +190,17 @@ int main(void)
 #endif
         
 #ifdef ENABLE_DEBUG_PAGE
-        /* ==================== 计算循环时间（使用TIM3的ms计数器） ==================== */
-        loop_time_ms = tim3_ms_counter - loop_start_ms;
+        /* ==================== 计算循环时间（使用TIM3的100kHz计数器） ==================== */
+        display_loop_time_ms = tim3_ms_counter - loop_start_ms;
         
         /* 更新最大循环时间 */
-        if (loop_time_ms > loop_time_max_ms)
+        if (display_loop_time_ms > display_loop_time_max_ms)
         {
-            loop_time_max_ms = loop_time_ms;
+            display_loop_time_max_ms = display_loop_time_ms;
         }
 #endif
     }
 }
-
-/**
- * @brief  页面0: 心率血氧显示
- */
-static void Display_Page0_HeartRate(void)
-{
-    /* 标题 */
-    OLED_ShowString(0, 0, "Heart Rate & SpO2", OLED_6X8);
-    
-    /* 分隔线 */
-    OLED_DrawLine(0, 10, 127, 10);
-    
-    /* 心率显示 */
-    OLED_ShowString(10, 16, "HR:", OLED_8X16);
-    OLED_ShowNum(50, 16, HR_new, 3, OLED_8X16);
-    OLED_ShowString(80, 16, "bpm", OLED_8X16);
-    
-    /* 血氧显示 */
-    OLED_ShowString(10, 36, "SpO2:", OLED_8X16);
-    OLED_ShowNum(60, 36, SpO2_value, 3, OLED_8X16);
-    OLED_ShowString(100, 36, "%", OLED_8X16);
-    
-    /* 页码指示 */
-    OLED_ShowString(0, 56, "<K1", OLED_6X8);
-#ifdef ENABLE_DEBUG_PAGE
-    OLED_ShowString(45, 56, "1/3", OLED_6X8);
-#else
-    OLED_ShowString(45, 56, "1/2", OLED_6X8);
-#endif
-    OLED_ShowString(110, 56, "K3>", OLED_6X8);
-    
-    OLED_Update();
-}
-
-/**
- * @brief  页面1: 心电图显示
- */
-static void Display_Page1_ECG(void)
-{
-    /* 标题 */
-    OLED_ShowString(0, 0, "ECG Monitor", OLED_6X8);
-    
-    /* 坐标系绘制 */
-    OLED_DrawLine(1, 54, 120, 54);     /* X轴 */
-    OLED_DrawLine(1, 10, 1, 54);       /* Y轴 */
-    OLED_DrawTriangle(1, 8, 0, 10, 2, 10, OLED_UNFILLED);    /* Y轴箭头 */
-    OLED_DrawTriangle(120, 55, 120, 53, 123, 54, OLED_UNFILLED);  /* X轴箭头 */
-    
-    /* 显示心电数据（由Timer3中断更新） */
-    OLED_ShowNum(100, 0, test, 3, OLED_6X8);
-    
-    /* 页码指示 */
-    OLED_ShowString(0, 56, "<K1", OLED_6X8);
-#ifdef ENABLE_DEBUG_PAGE
-    OLED_ShowString(45, 56, "2/3", OLED_6X8);
-#else
-    OLED_ShowString(45, 56, "2/2", OLED_6X8);
-#endif
-    OLED_ShowString(110, 56, "K3>", OLED_6X8);
-    
-    OLED_Update();
-}
-
-#ifdef ENABLE_DEBUG_PAGE
-/**
- * @brief  页面2: 调试页面
- * 
- * @details 显示内容（10Hz刷新）:
- *          ┌────────────────────────┐
- *          │ [DEBUG] 10Hz           │
- *          │────────────────────────│
- *          │ Loop: 1234 ms          │
- *          │ Max:  5678 ms          │
- *          │ ADC:  2048   HR: 75    │
- *          │ Time: 123 s  SpO2: 98  │
- *          │ [<] Page 3/3     [>]   │
- *          └────────────────────────┘
- */
-static void Display_Page2_Debug(void)
-{
-    uint16_t adc_raw;
-    
-    /* 读取当前ADC值 */
-    adc_raw = AD_GetValue();
-    
-    /* 标题 */
-    OLED_ShowString(0, 0, "[DEBUG] 10Hz", OLED_6X8);
-    
-    /* 分隔线 */
-    OLED_DrawLine(0, 10, 127, 10);
-    
-    /* 循环时间（当前） */
-    OLED_ShowString(0, 14, "Loop:", OLED_6X8);
-    OLED_ShowNum(36, 14, loop_time_ms, 5, OLED_6X8);
-    OLED_ShowString(72, 14, "10ns", OLED_6X8);
-    
-    /* 循环时间（最大） */
-    OLED_ShowString(0, 24, "Max:", OLED_6X8);
-    OLED_ShowNum(30, 24, loop_time_max_ms, 5, OLED_6X8);
-    OLED_ShowString(66, 24, "ms", OLED_6X8);
-    
-    /* ADC和心率 */
-    OLED_ShowString(0, 34, "ADC:", OLED_6X8);
-    OLED_ShowNum(30, 34, adc_raw, 4, OLED_6X8);
-    OLED_ShowString(80, 34, "HR:", OLED_6X8);
-    OLED_ShowNum(104, 34, HR_new, 3, OLED_6X8);
-    
-    /* 运行时间和血氧 */
-    OLED_ShowString(0, 44, "Time:", OLED_6X8);
-    OLED_ShowNum(36, 44, test, 4, OLED_6X8);
-    OLED_ShowString(62, 44, "s", OLED_6X8);
-    OLED_ShowString(80, 44, "SpO2:", OLED_6X8);
-    OLED_ShowNum(110, 44, SpO2_value, 3, OLED_6X8);
-    
-    /* 页码指示 */
-    OLED_ShowString(0, 56, "<K1", OLED_6X8);
-    OLED_ShowString(45, 56, "3/3", OLED_6X8);
-    OLED_ShowString(110, 56, "K3>", OLED_6X8);
-    
-    OLED_Update();
-}
-#endif
 
 /**
  * @brief  低通滤波函数
