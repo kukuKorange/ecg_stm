@@ -4,6 +4,7 @@
 #include "stm32f10x.h"
 #include "stm32f10x_gpio.h"
 #include "stm32f10x_rcc.h"
+#include "kconfig.h"
 
 /* 引脚定义 */
 /*******************************************************/
@@ -93,5 +94,15 @@
 					LED3_OFF
 
 void LED_GPIO_Config(void);
+
+#ifdef ENABLE_LED_INDICATOR
+/**
+ * @brief  LED状态更新
+ * @note   根据心率血氧数据更新LED状态:
+ *         - LED1: 手指检测指示（检测到亮）
+ *         - LED2: 心率报警指示（超阈值亮）
+ */
+void LED_StatusUpdate(void);
+#endif
 
 #endif /* __LED_H */

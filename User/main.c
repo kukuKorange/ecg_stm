@@ -129,32 +129,9 @@ int main(void)
                 break;
         }
         
-        
         /* ==================== LED状态指示 ==================== */
 #ifdef ENABLE_LED_INDICATOR
-        {
-            MAX30102_Data_t *data = MAX30102_GetData();
-            
-            /* LED1: 手指检测指示 */
-            if (data->finger_detected)
-            {
-                LED1_ON
-            }
-            else
-            {
-                LED1_OFF
-            }
-            
-            /* LED2: 心率报警 */
-            if (data->heart_rate >= HR_ALARM_THRESHOLD)
-            {
-                LED2_ON
-            }
-            else
-            {
-                LED2_OFF
-            }
-        }
+        LED_StatusUpdate();
 #endif
         
 #ifdef ENABLE_DEBUG_PAGE
