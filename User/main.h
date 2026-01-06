@@ -9,6 +9,9 @@
 #ifndef __MAIN_H
 #define __MAIN_H
 
+/* 全局配置文件 - 必须最先包含 */
+#include "kconfig.h"
+
 /* 禁用HAL库，使用标准外设库 */
 #undef USE_HAL_DRIVER
 

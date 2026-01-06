@@ -39,12 +39,11 @@ static void Display_Page2_Debug(void);
 #endif
 
 /* =========================================变量定义区====================================== */
-#define CACHE_NUMS 150  /* 缓存数 */
-#define PPG_DATA_THRESHOLD 100000   /* 检测阈值 */
+/* 注: HR_CACHE_NUMS 和 PPG_DATA_THRESHOLD 已在 kconfig.h 中定义为 HR_CACHE_NUMS 和 PPG_DATA_THRESHOLD */
 uint8_t max30102_int_flag = 0;      /* 中断标志 */
 
-float ppg_data_cache_RED[CACHE_NUMS] = {0};  /* 缓存区 */
-float ppg_data_cache_IR[CACHE_NUMS] = {0};   /* 缓存区 */
+float ppg_data_cache_RED[HR_CACHE_NUMS] = {0};  /* 缓存区 */
+float ppg_data_cache_IR[HR_CACHE_NUMS] = {0};   /* 缓存区 */
 
 uint16_t Chart[250];
 uint16_t Chart_1[120];
@@ -173,18 +172,19 @@ int main(void)
                 HR_new = 0;
             }
 
-            if(cache_counter >= CACHE_NUMS)
+            if(cache_counter >= HR_CACHE_NUMS)
             {
                 cache_counter = 0;
-                HR_new = Lowpass(HR_last, max30102_getHeartRate(ppg_data_cache_IR, CACHE_NUMS), 0.6);
-                SpO2_value = max30102_getSpO2(ppg_data_cache_IR, ppg_data_cache_RED, CACHE_NUMS);
-                HR_last = max30102_getHeartRate(ppg_data_cache_IR, CACHE_NUMS);
+                HR_new = Lowpass(HR_last, max30102_getHeartRate(ppg_data_cache_IR, HR_CACHE_NUMS), 0.6);
+                SpO2_value = max30102_getSpO2(ppg_data_cache_IR, ppg_data_cache_RED, HR_CACHE_NUMS);
+                HR_last = max30102_getHeartRate(ppg_data_cache_IR, HR_CACHE_NUMS);
                 ESP8266_Send("HeartRate", (int)HR_new);
             }
         }
         
         /* ==================== LED报警 ==================== */
-        if(HR_new >= 70)
+#ifdef ENABLE_LED_INDICATOR
+        if(HR_new >= HR_ALARM_THRESHOLD)
         {
             LED2_ON
         }
@@ -192,6 +192,7 @@ int main(void)
         {
             LED2_OFF
         }
+#endif
         
 #ifdef ENABLE_DEBUG_PAGE
         /* ==================== 计算循环时间（使用TIM3的ms计数器） ==================== */
