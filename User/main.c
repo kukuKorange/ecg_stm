@@ -27,10 +27,12 @@
 #include "ad8232.h"
 #include "key.h"
 
-/* =========================================函数申明区====================================== */
+/* =========================================函数声明区====================================== */
 
 void SystemClock_Config(void);
 static float Lowpass(float X_last, float X_new, float K);
+static void Display_Page0_HeartRate(void);
+static void Display_Page1_ECG(void);
 
 /* =========================================变量定义区====================================== */
 #define CACHE_NUMS 150  /* 缓存数 */
@@ -44,8 +46,9 @@ uint16_t Chart[250];
 uint16_t Chart_1[120];
 uint16_t HR_new = 0;
 uint16_t HR_last = 0;
+uint16_t SpO2_value = 0;  /* 血氧值 */
 
-uint8_t KeyNum;
+static uint8_t last_page = 0xFF;  /* 上一次的页面，用于检测页面切换 */
 
 /**
  * @brief  主函数
@@ -81,66 +84,155 @@ int main(void)
     AD_Init();
     AD8232Init();
     Timer3_Init();
-    /* 心电图外设配置 */
     
+    /* 按键初始化 */
     Key_Init();
-    
-    /* 坐标系绘制 */
-    OLED_DrawLine(1, 62, 120, 62);
-    OLED_DrawLine(1, 8, 1, 62);
-    OLED_DrawTriangle(1, 6, 0, 8, 2, 8, OLED_UNFILLED);
-    OLED_DrawTriangle(120, 63, 120, 61, 123, 62, OLED_UNFILLED);
-    OLED_Update();
-    /* 坐标系绘制 */
     
     while(1)
     {
-        OLED_ShowNum(1, 20, test, 2, OLED_6X8);
-        OLED_Update();
+        /* ==================== 按键处理 ==================== */
+        Key_Process();
         
+        /* ==================== 页面切换检测 ==================== */
+        if (current_page != last_page)
+        {
+            OLED_Clear();
+            last_page = current_page;
+        }
+        
+        /* ==================== 根据当前页面显示内容 ==================== */
+        switch (current_page)
+        {
+            case PAGE_HEARTRATE:
+                Display_Page0_HeartRate();
+                break;
+                
+            case PAGE_ECG:
+                Display_Page1_ECG();
+                break;
+                
+            default:
+                current_page = PAGE_HEARTRATE;
+                break;
+        }
+        
+        /* ==================== 心率血氧数据采集（后台运行）==================== */
         if(1)  /* 中断信号产生 */
         { 
             max30102_int_flag = 0;
             max30102_fifo_read(max30102_data);      /* 读取数据 */
         
-            ir_max30102_fir(&max30102_data[0], &fir_output[0]);  /* 实测ir数据采集在前面，red数据在后面 */
-            red_max30102_fir(&max30102_data[1], &fir_output[1]); /* 滤波 */
+            ir_max30102_fir(&max30102_data[0], &fir_output[0]);
+            red_max30102_fir(&max30102_data[1], &fir_output[1]);
         
-            if((max30102_data[0] > PPG_DATA_THRESHOLD) && (max30102_data[1] > PPG_DATA_THRESHOLD))  /* 大于阈值，说明传感器有接触 */
+            if((max30102_data[0] > PPG_DATA_THRESHOLD) && (max30102_data[1] > PPG_DATA_THRESHOLD))
             {       
                 ppg_data_cache_IR[cache_counter] = fir_output[0];
                 ppg_data_cache_RED[cache_counter] = fir_output[1];
                 cache_counter++;
                 LED1_ON
             }
-            else  /* 小于阈值 */
+            else
             {
                 cache_counter = 0;
                 LED1_OFF
                 HR_new = 0;
             }
 
-            if(cache_counter >= CACHE_NUMS)  /* 收集满了数据 */
+            if(cache_counter >= CACHE_NUMS)
             {
                 cache_counter = 0;
                 HR_new = Lowpass(HR_last, max30102_getHeartRate(ppg_data_cache_IR, CACHE_NUMS), 0.6);
-                OLED_ShowNum(5, 1, max30102_getHeartRate(ppg_data_cache_IR, CACHE_NUMS), 2, OLED_6X8);
-                OLED_ShowNum(20, 1, max30102_getSpO2(ppg_data_cache_IR, ppg_data_cache_RED, CACHE_NUMS), 2, OLED_6X8);
-                OLED_Update();
+                SpO2_value = max30102_getSpO2(ppg_data_cache_IR, ppg_data_cache_RED, CACHE_NUMS);
                 HR_last = max30102_getHeartRate(ppg_data_cache_IR, CACHE_NUMS);
                 ESP8266_Send("HeartRate", (int)HR_new);
             }
         }
         
-        if(HR_new >= 70)  /* 检测心率值是否超出80 */
+        /* ==================== LED报警 ==================== */
+        if(HR_new >= 70)
         {
-            LED2_ON  /* 蜂鸣器开 */
+            LED2_ON
         }
         else
         {
             LED2_OFF
         }
     }
+}
+
+/**
+ * @brief  页面0: 心率血氧显示
+ * 
+ * @details 显示内容:
+ *          ┌────────────────────────┐
+ *          │ ♥ Heart Rate & SpO2    │
+ *          │                        │
+ *          │   HR: 75 bpm           │
+ *          │   SpO2: 98 %           │
+ *          │                        │
+ *          │ [<] Page 1/2     [>]   │
+ *          └────────────────────────┘
+ */
+static void Display_Page0_HeartRate(void)
+{
+    /* 标题 */
+    OLED_ShowString(0, 0, "Heart Rate & SpO2", OLED_6X8);
+    
+    /* 分隔线 */
+    OLED_DrawLine(0, 10, 127, 10);
+    
+    /* 心率显示 */
+    OLED_ShowString(10, 16, "HR:", OLED_8X16);
+    OLED_ShowNum(50, 16, HR_new, 3, OLED_8X16);
+    OLED_ShowString(80, 16, "bpm", OLED_8X16);
+    
+    /* 血氧显示 */
+    OLED_ShowString(10, 36, "SpO2:", OLED_8X16);
+    OLED_ShowNum(60, 36, SpO2_value, 3, OLED_8X16);
+    OLED_ShowString(100, 36, "%", OLED_8X16);
+    
+    /* 页码指示 */
+    OLED_ShowString(0, 56, "<K1", OLED_6X8);
+    OLED_ShowString(45, 56, "1/2", OLED_6X8);
+    OLED_ShowString(110, 56, "K3>", OLED_6X8);
+    
+    OLED_Update();
+}
+
+/**
+ * @brief  页面1: 心电图显示
+ * 
+ * @details 显示内容:
+ *          ┌────────────────────────┐
+ *          │ ECG Monitor            │
+ *          │ ┌──────────────────┐   │
+ *          │ │    /\    /\      │   │
+ *          │ │___/  \__/  \___  │   │
+ *          │ └──────────────────┘   │
+ *          │ [<] Page 2/2     [>]   │
+ *          └────────────────────────┘
+ */
+static void Display_Page1_ECG(void)
+{
+    /* 标题 */
+    OLED_ShowString(0, 0, "ECG Monitor", OLED_6X8);
+    
+    /* 坐标系绘制 */
+    OLED_DrawLine(1, 54, 120, 54);     /* X轴 */
+    OLED_DrawLine(1, 10, 1, 54);       /* Y轴 */
+    OLED_DrawTriangle(1, 8, 0, 10, 2, 10, OLED_UNFILLED);    /* Y轴箭头 */
+    OLED_DrawTriangle(120, 55, 120, 53, 123, 54, OLED_UNFILLED);  /* X轴箭头 */
+    
+    /* 显示心电数据（由Timer3中断更新） */
+    OLED_ShowNum(100, 0, test, 3, OLED_6X8);
+    
+    /* 页码指示 */
+    OLED_ShowString(0, 56, "<K1", OLED_6X8);
+    OLED_ShowString(45, 56, "2/2", OLED_6X8);
+    OLED_ShowString(110, 56, "K3>", OLED_6X8);
+    
+    OLED_Update();
 }
 
 /**
@@ -152,68 +244,31 @@ static float Lowpass(float X_last, float X_new, float K)
 }
 
 /**
- * @brief  系统时钟配置
- *         系统时钟配置如下:
- *            系统时钟源               = PLL (HSE)
- *            SYSCLK(Hz)              = 72000000
- *            HCLK(Hz)                = 72000000
- *            AHB Prescaler           = 1
- *            APB1 Prescaler          = 2
- *            APB2 Prescaler          = 1
- *            HSE Frequency(Hz)       = 8000000
- *            PLL MUL                 = 9
- *            Flash Latency(WS)       = 2
- * @param  None
- * @retval None
+ * @brief  系统时钟配置 (72MHz)
  */
 void SystemClock_Config(void)
 {
     ErrorStatus HSEStartUpStatus;
     
-    /* 复位RCC时钟配置为默认状态 */
     RCC_DeInit();
-    
-    /* 使能外部高速晶振HSE */
     RCC_HSEConfig(RCC_HSE_ON);
-    
-    /* 等待HSE启动稳定 */
     HSEStartUpStatus = RCC_WaitForHSEStartUp();
     
     if(HSEStartUpStatus == SUCCESS)
     {
-        /* 使能Flash预取缓冲区 */
         FLASH_PrefetchBufferCmd(FLASH_PrefetchBuffer_Enable);
-        
-        /* 设置Flash等待周期，SYSCLK > 48MHz需要2个等待周期 */
         FLASH_SetLatency(FLASH_Latency_2);
-        
-        /* 设置AHB时钟(HCLK) = SYSCLK */
         RCC_HCLKConfig(RCC_SYSCLK_Div1);
-        
-        /* 设置APB2时钟(PCLK2) = HCLK */
         RCC_PCLK2Config(RCC_HCLK_Div1);
-        
-        /* 设置APB1时钟(PCLK1) = HCLK/2 */
         RCC_PCLK1Config(RCC_HCLK_Div2);
-        
-        /* 配置PLL: PLLCLK = HSE * 9 = 72MHz */
         RCC_PLLConfig(RCC_PLLSource_HSE_Div1, RCC_PLLMul_9);
-        
-        /* 使能PLL */
         RCC_PLLCmd(ENABLE);
-        
-        /* 等待PLL稳定 */
         while(RCC_GetFlagStatus(RCC_FLAG_PLLRDY) == RESET);
-        
-        /* 选择PLL作为系统时钟源 */
         RCC_SYSCLKConfig(RCC_SYSCLKSource_PLLCLK);
-        
-        /* 等待PLL被选为系统时钟源 */
         while(RCC_GetSYSCLKSource() != 0x08);
     }
     else
     {
-        /* HSE启动失败，用户可在此添加错误处理 */
         while(1);
     }
 }
