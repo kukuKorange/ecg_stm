@@ -1,7 +1,36 @@
 #include "max30102.h"
+#include "max30102_fir.h"
 #include "./i2c/bsp_i2c.h"
 #include "stm32f10x_exti.h"
 #include "misc.h"
+
+/*============================================================================*/
+/*                              全局变量                                       */
+/*============================================================================*/
+
+/** @brief 心率血氧数据结构体（全局，供其他模块使用） */
+MAX30102_Data_t g_max30102_data = {0, 0, 0, 0};
+
+/*============================================================================*/
+/*                              私有变量                                       */
+/*============================================================================*/
+
+static float ppg_data_cache_IR[HR_CACHE_NUMS] = {0};   /**< IR通道缓存 */
+static float ppg_data_cache_RED[HR_CACHE_NUMS] = {0};  /**< RED通道缓存 */
+static uint16_t cache_counter = 0;                     /**< 缓存计数器 */
+static uint16_t hr_last = 0;                           /**< 上一次心率值（用于滤波）*/
+
+/*============================================================================*/
+/*                              私有函数                                       */
+/*============================================================================*/
+
+/**
+ * @brief  低通滤波函数
+ */
+static float Lowpass(float X_last, float X_new, float K)
+{
+    return X_last + K * (X_new - X_last);
+}
 
 /**
   * @brief  MAX30102 I2C写寄存器
@@ -192,3 +221,66 @@ float max30102_getSpO2(float *ir_input_data, float *red_input_data, uint16_t cac
     return ((-45.060) * R * R + 30.354 * R + 94.845);
 }
 
+/*============================================================================*/
+/*                              数据处理函数                                   */
+/*============================================================================*/
+
+/**
+ * @brief  心率血氧数据处理
+ * @note   在主循环中调用，完成数据采集、滤波和计算
+ */
+void MAX30102_Process(void)
+{
+    float max30102_data[2];
+    float fir_output[2];
+    
+    /* 读取FIFO数据 */
+    max30102_fifo_read(max30102_data);
+    
+    /* FIR滤波 */
+    ir_max30102_fir(&max30102_data[0], &fir_output[0]);
+    red_max30102_fir(&max30102_data[1], &fir_output[1]);
+    
+    /* 检测手指是否放置 */
+    if ((max30102_data[0] > PPG_DATA_THRESHOLD) && (max30102_data[1] > PPG_DATA_THRESHOLD))
+    {
+        /* 手指检测到，缓存数据 */
+        g_max30102_data.finger_detected = 1;
+        
+        ppg_data_cache_IR[cache_counter] = fir_output[0];
+        ppg_data_cache_RED[cache_counter] = fir_output[1];
+        cache_counter++;
+        
+        /* 缓存满，计算心率和血氧 */
+        if (cache_counter >= HR_CACHE_NUMS)
+        {
+            cache_counter = 0;
+            
+            /* 计算心率（带低通滤波） */
+            g_max30102_data.heart_rate =  (uint16_t)max30102_getHeartRate(ppg_data_cache_IR, HR_CACHE_NUMS);
+            
+            /* 计算血氧 */
+            g_max30102_data.spo2 = (uint16_t)max30102_getSpO2(ppg_data_cache_IR, ppg_data_cache_RED, HR_CACHE_NUMS);
+            
+            /* 标记数据就绪 */
+            g_max30102_data.data_ready = 1;
+        }
+    }
+    else
+    {
+        /* 手指未检测到，重置状态 */
+        cache_counter = 0;
+        g_max30102_data.finger_detected = 0;
+        g_max30102_data.heart_rate = 0;
+        g_max30102_data.data_ready = 0;
+    }
+}
+
+/**
+ * @brief  获取心率血氧数据指针
+ * @retval 指向 MAX30102_Data_t 结构体的指针
+ */
+MAX30102_Data_t* MAX30102_GetData(void)
+{
+    return &g_max30102_data;
+}

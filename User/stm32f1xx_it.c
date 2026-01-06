@@ -11,7 +11,8 @@
 #include "stm32f1xx_it.h" 
 
 /* Private variables ---------------------------------------------------------*/
-extern uint8_t max30102_int_flag;
+/* Private function prototypes -----------------------------------------------*/
+/* Private functions ---------------------------------------------------------*/
 
 /******************************************************************************/
 /*            Cortex-M3 Processor Exceptions Handlers                         */
@@ -100,7 +101,6 @@ void EXTI9_5_IRQHandler(void)
 {
     if(EXTI_GetITStatus(EXTI_Line5) != RESET)
     {
-        max30102_int_flag = 1;
         EXTI_ClearITPendingBit(EXTI_Line5);
     }
 }

@@ -12,39 +12,27 @@
 #include "stm32f10x.h"
 #include "stm32f10x_rcc.h"
 #include "stm32f10x_flash.h"
-#include <stdlib.h>
-#include "usart/bsp_debug_usart.h"
+
+/* 外设驱动 */
 #include "led/bsp_led.h" 
-#include "i2c/bsp_i2c.h"
-#include "max30102.h"
-#include "max30102_fir.h"
 #include "oled.h"
-#include "Timer1.h"
 #include "Timer2.h"
-#include "esp8266.h"
 #include "usart2.h"
+#include "esp8266.h"
 #include "AD.h"
 #include "ad8232.h"
 #include "key.h"
+
+/* 功能模块 */
+#include "max30102.h"
+#include "max30102_fir.h"
 #include "module/display/display.h"
 
 /* =========================================函数声明区====================================== */
 
 void SystemClock_Config(void);
-static float Lowpass(float X_last, float X_new, float K);
 
 /* =========================================变量定义区====================================== */
-/* 注: HR_CACHE_NUMS 和 PPG_DATA_THRESHOLD 已在 kconfig.h 中定义为 HR_CACHE_NUMS 和 PPG_DATA_THRESHOLD */
-uint8_t max30102_int_flag = 0;      /* 中断标志 */
-
-float ppg_data_cache_RED[HR_CACHE_NUMS] = {0};  /* 缓存区 */
-float ppg_data_cache_IR[HR_CACHE_NUMS] = {0};   /* 缓存区 */
-
-uint16_t Chart[250];
-uint16_t Chart_1[120];
-uint16_t HR_new = 0;
-uint16_t HR_last = 0;
-uint16_t SpO2_value = 0;  /* 血氧值 */
 
 static uint8_t last_page = 0xFF;  /* 上一次的页面，用于检测页面切换 */
 
@@ -65,9 +53,6 @@ uint32_t display_loop_time_max_ms = 0;          /* 最大循环时间（10us）-
  */
 int main(void)
 {
-    uint16_t cache_counter = 0;  /* 缓存计数器 */
-    float max30102_data[2], fir_output[2];
-    
     /* 配置NVIC优先级分组 */
     NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
     
@@ -144,48 +129,31 @@ int main(void)
                 break;
         }
         
-        /* ==================== 心率血氧数据采集（后台运行）==================== */
-        if(1)  /* 中断信号产生 */
-        { 
-            max30102_int_flag = 0;
-            max30102_fifo_read(max30102_data);      /* 读取数据 */
         
-            ir_max30102_fir(&max30102_data[0], &fir_output[0]);
-            red_max30102_fir(&max30102_data[1], &fir_output[1]);
-        
-            if((max30102_data[0] > PPG_DATA_THRESHOLD) && (max30102_data[1] > PPG_DATA_THRESHOLD))
-            {       
-                ppg_data_cache_IR[cache_counter] = fir_output[0];
-                ppg_data_cache_RED[cache_counter] = fir_output[1];
-                cache_counter++;
+        /* ==================== LED状态指示 ==================== */
+#ifdef ENABLE_LED_INDICATOR
+        {
+            MAX30102_Data_t *data = MAX30102_GetData();
+            
+            /* LED1: 手指检测指示 */
+            if (data->finger_detected)
+            {
                 LED1_ON
             }
             else
             {
-                cache_counter = 0;
                 LED1_OFF
-                HR_new = 0;
             }
-
-            if(cache_counter >= HR_CACHE_NUMS)
+            
+            /* LED2: 心率报警 */
+            if (data->heart_rate >= HR_ALARM_THRESHOLD)
             {
-                cache_counter = 0;
-                HR_new = Lowpass(HR_last, max30102_getHeartRate(ppg_data_cache_IR, HR_CACHE_NUMS), 0.6);
-                SpO2_value = max30102_getSpO2(ppg_data_cache_IR, ppg_data_cache_RED, HR_CACHE_NUMS);
-                HR_last = max30102_getHeartRate(ppg_data_cache_IR, HR_CACHE_NUMS);
-                // ESP8266_Send("HeartRate", (int)HR_new);
+                LED2_ON
             }
-        }
-        
-        /* ==================== LED报警 ==================== */
-#ifdef ENABLE_LED_INDICATOR
-        if(HR_new >= HR_ALARM_THRESHOLD)
-        {
-            LED2_ON
-        }
-        else
-        {
-            LED2_OFF
+            else
+            {
+                LED2_OFF
+            }
         }
 #endif
         
@@ -200,14 +168,6 @@ int main(void)
         }
 #endif
     }
-}
-
-/**
- * @brief  低通滤波函数
- */
-static float Lowpass(float X_last, float X_new, float K)
-{
-    return X_last + K * (X_new - X_last);
 }
 
 /**

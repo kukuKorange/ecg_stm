@@ -21,6 +21,8 @@
 #include "stm32f10x_tim.h"
 #include "ad8232.h"
 #include "key.h"
+#include "max30102.h"
+#include "max30102_fir.h"
 
 /*============================ 私有变量 ============================*/
 
@@ -83,9 +85,10 @@ extern volatile uint8_t debug_refresh_flag;  /**< 调试页面刷新标志 */
   * @note   中断频率: 100000Hz
   *         
   *         任务分配:
-  *         - 每1000次(1Hz):  更新测试计数器
-  *         - 每100次(10Hz):  调试页面刷新标志
-  *         - 每5次(200Hz):   ECG采样与绘制
+  *         - 每100000次(1Hz):  更新测试计数器
+  *         - 每10000次(10Hz):  调试页面刷新标志
+  *         - 每500次(200Hz):   ECG采样与绘制
+  *         - 每2000次(50Hz):  心率血氧数据采集
   */
 void TIM3_IRQHandler(void)
 {
@@ -100,6 +103,12 @@ void TIM3_IRQHandler(void)
             test++;
             tim3_counter = 0;
         }
+		
+		/* 50Hz任务: 心率血氧数据采集 */
+		if(tim3_counter % 2000 == 0){
+			/* ==================== 心率血氧数据采集 ==================== */
+			MAX30102_Process();
+		}
         
 #ifdef ENABLE_DEBUG_PAGE
         /* 10Hz任务: 调试页面刷新（仅在调试页面执行） */
