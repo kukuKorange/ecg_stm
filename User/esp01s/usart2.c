@@ -1,135 +1,171 @@
+/**
+  ******************************************************************************
+  * @file    usart2.c
+  * @brief   USART2串口驱动 (用于ESP8266通信)
+  * 
+  * @details 实现功能：
+  *          - USART2初始化 (PA2-TX, PA3-RX)
+  *          - 中断接收（帧结束标志: 0x0D 0x0A）
+  *          - printf风格的格式化发送
+  ******************************************************************************
+  */
+
 #ifdef USE_STDPERIPH_DRIVER
 
 #include "stm32f10x.h"
-#include "stm32f10x_rcc.h"     // ���� RCC ���趨��
+#include "stm32f10x_rcc.h"
 #include "stm32f10x_usart.h"
-#include "sys.h"
-
 #include "usart2.h"
-#include "stdarg.h"	 	 
-#include "stdio.h"	 	 
+#include "sys.h"
+#include "stdarg.h"
+#include "stdio.h"
 #include "string.h"
-//////////////////////////////////////////////////////////////////////////////////	   
-//������ֻ��ѧϰʹ�ã�δ���������ɣ��������������κ���;
-//ALIENTEK��ӢSTM32������V3
-//����3��ʼ������
-//����ԭ��@ALIENTEK
-//������̳:www.openedv.com
-//�޸�����:2015/3/14
-//�汾��V1.0
-//��Ȩ���У�����ؾ���
-//Copyright(C) �������������ӿƼ����޹�˾ 2014-2024
-//All rights reserved
-//********************************************************************************
-//�޸�˵��
-//��
-////////////////////////////////////////////////////////////////////////////////// 	
 
-//���ڷ��ͻ�����
-__align(8) uint8_t USART2_TX_BUF[USART2_MAX_SEND_LEN]; 	//���ͻ���,���USART2_MAX_SEND_LEN�ֽ� 
-//���ڽ��ջ�����
-uint8_t USART2_RX_BUF[USART2_MAX_RECV_LEN]; 				//���ջ���,���USART2_MAX_RECV_LEN���ֽ�.
+/*============================ 全局变量 ============================*/
 
-//������ģʽ�£� timer=10ms
-//ͨ���жϽ�������2���ַ�֮���ʱ������timer�������ǲ���һ������������.
-//���2���ַ����ռ������timer,����Ϊ����1����������.Ҳ���ǳ���timerû�н��յ�
-//�κ�����,���ʾ�˴ν������.
-//���յ�������״̬
-//[15]:0,û�н��յ�����;1,���յ���һ������.
-//[14:0]:���յ������ݳ���
+/** @brief 发送缓冲区 (8字节对齐) */
+__align(8) uint8_t USART2_TX_BUF[USART2_MAX_SEND_LEN];
+
+/** @brief 接收缓冲区 */
+uint8_t USART2_RX_BUF[USART2_MAX_RECV_LEN];
+
+/**
+  * @brief  接收状态标志
+  * @note   帧模式接收，以 0x0D 0x0A (\\r\\n) 作为帧结束标志
+  *         
+  *         bit15:    接收完成标志 (1=收到完整帧)
+  *         bit14:    收到0x0D标志
+  *         bit[13:0]: 已接收数据长度
+  */
 uint16_t USART2_RX_STA = 0;
-//��ʼ��IO ����3
-//pclk1:PCLK1ʱ��Ƶ��(Mhz)
-//bound:������ 
+
+/*============================ 函数实现 ============================*/
+
+/**
+  * @brief  USART2初始化
+  * @param  bound: 波特率
+  * @note   引脚配置：
+  *         - PA2: USART2_TX (复用推挽输出)
+  *         - PA3: USART2_RX (浮空输入)
+  */
 void usart2_init(uint32_t bound)
-{  	 
-	NVIC_InitTypeDef NVIC_InitStructure;
-	GPIO_InitTypeDef GPIO_InitStructure;
-	USART_InitTypeDef USART_InitStructure;
+{
+    NVIC_InitTypeDef NVIC_InitStructure;
+    GPIO_InitTypeDef GPIO_InitStructure;
+    USART_InitTypeDef USART_InitStructure;
 
-	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);	// GPIOAʱ��
-	RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2,ENABLE); //����2ʱ��ʹ��
+    /* 使能时钟 */
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2, ENABLE);
 
-		 //USART2_TX   PA2
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_2; //PA2
-	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;	//�����������
-	GPIO_Init(GPIOA, &GPIO_InitStructure); //��ʼ��PA2
-   
-    //USART2_RX	  PA3
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_3;
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;//��������
-	GPIO_Init(GPIOA, &GPIO_InitStructure);  //��ʼ��PA3
-	
-	//�����ж����ȼ�
-	NVIC_InitStructure.NVIC_IRQChannel = USART2_IRQn;
-	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority=3 ;//��ռ���ȼ�3
-	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 3;		//�����ȼ�3
-	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;			//IRQͨ��ʹ��
-	NVIC_Init(&NVIC_InitStructure);	//����ָ���Ĳ�����ʼ��VIC�Ĵ���
-	
-	   //USART2 ��ʼ������
-	USART_InitStructure.USART_BaudRate = bound;//����������
-	USART_InitStructure.USART_WordLength = USART_WordLength_8b;//�ֳ�Ϊ8λ���ݸ�ʽ
-	USART_InitStructure.USART_StopBits = USART_StopBits_1;//һ��ֹͣλ
-	USART_InitStructure.USART_Parity = USART_Parity_No;//����żУ��λ
-	USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;//��Ӳ������������
-	USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;	//�շ�ģʽ
-  
-	USART_Init(USART2, &USART_InitStructure); //��ʼ������	2
-  USART_ITConfig(USART2, USART_IT_RXNE, ENABLE);//�����ж�   
-	USART_Cmd(USART2, ENABLE);                    //ʹ�ܴ��� 
-  
+    /* 配置 PA2 (TX) 为复用推挽输出 */
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_2;
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
+    GPIO_Init(GPIOA, &GPIO_InitStructure);
+
+    /* 配置 PA3 (RX) 为浮空输入 */
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_3;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
+    GPIO_Init(GPIOA, &GPIO_InitStructure);
+
+    /* 配置中断优先级 */
+    NVIC_InitStructure.NVIC_IRQChannel = USART2_IRQn;
+    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 3;  /* 抢占优先级3 */
+    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 3;         /* 子优先级3 */
+    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+    NVIC_Init(&NVIC_InitStructure);
+
+    /* 配置USART2参数 */
+    USART_InitStructure.USART_BaudRate = bound;
+    USART_InitStructure.USART_WordLength = USART_WordLength_8b;
+    USART_InitStructure.USART_StopBits = USART_StopBits_1;
+    USART_InitStructure.USART_Parity = USART_Parity_No;
+    USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
+    USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;
+
+    USART_Init(USART2, &USART_InitStructure);
+    USART_ITConfig(USART2, USART_IT_RXNE, ENABLE);  /* 使能接收中断 */
+    USART_Cmd(USART2, ENABLE);
 }
 
-#ifdef USART2_RX_EN   								//���ʹ���˽���
+#ifdef USART2_RX_EN
+/**
+  * @brief  USART2中断服务函数
+  * @note   帧接收逻辑：
+  *         - 接收数据直到遇到 0x0D (\\r)
+  *         - 下一个字节为 0x0A (\\n) 时，标记接收完成
+  *         - 接收完成后 USART2_RX_STA 的 bit15 置1
+  */
 void USART2_IRQHandler(void)
 {
-	uint8_t Res;
-	if(USART_GetITStatus(USART2, USART_IT_RXNE) != RESET)  //�����жϣ����յ������ݱ�����0x0d  0x0a��β��
-	{
-		Res =USART_ReceiveData(USART2);//(USART1->DR);	//��ȡ���յ�������
-		
-		if((USART2_RX_STA&0x8000)==0)//����δ���
-		{
-			if(USART2_RX_STA&0x4000)//���յ���0x0d
-			{
-				if(Res!=0x0a)USART2_RX_STA=0;//���մ������¿�ʼ
-				else USART2_RX_STA|=0x8000;	//���������
-			}
-			else //û�յ�0X0D
-			{	
-				if(Res==0x0d)USART2_RX_STA|=0x4000;
-				else
-				{
-					USART2_RX_BUF[USART2_RX_STA&0X3FFF]=Res ;
-					USART2_RX_STA++;
-					if(USART2_RX_STA>(USART2_MAX_RECV_LEN-1))USART2_RX_STA=0;//�������ݴ������¿�ʼ����
-				}		 
-			}
-		}
-	}
-}   
-#endif
-#endif
-//����2,printf ����
-//ȷ��һ�η������ݲ�����USART2_MAX_SEND_LEN�ֽ�
+    uint8_t Res;
+
+    if (USART_GetITStatus(USART2, USART_IT_RXNE) != RESET)
+    {
+        Res = USART_ReceiveData(USART2);
+
+        if ((USART2_RX_STA & 0x8000) == 0)  /* 接收未完成 */
+        {
+            if (USART2_RX_STA & 0x4000)     /* 已收到 0x0D */
+            {
+                if (Res != 0x0A)
+                {
+                    USART2_RX_STA = 0;      /* 接收错误，重新开始 */
+                }
+                else
+                {
+                    USART2_RX_STA |= 0x8000; /* 接收完成 */
+                }
+            }
+            else  /* 未收到 0x0D */
+            {
+                if (Res == 0x0D)
+                {
+                    USART2_RX_STA |= 0x4000; /* 标记收到 0x0D */
+                }
+                else
+                {
+                    USART2_RX_BUF[USART2_RX_STA & 0x3FFF] = Res;
+                    USART2_RX_STA++;
+
+                    /* 溢出保护 */
+                    if (USART2_RX_STA > (USART2_MAX_RECV_LEN - 1))
+                    {
+                        USART2_RX_STA = 0;
+                    }
+                }
+            }
+        }
+    }
+}
+#endif /* USART2_RX_EN */
+
+/**
+  * @brief  USART2格式化发送函数
+  * @param  fmt: 格式化字符串
+  * @param  ...: 可变参数
+  * @note   使用方法与printf相同，最大发送长度为 USART2_MAX_SEND_LEN
+  * 
+  * @example u2_printf("AT+CWJAP=\"%s\",\"%s\"\r\n", ssid, password);
+  */
 void u2_printf(char *fmt, ...)
 {
     uint16_t i, j;
     va_list ap;
+
     va_start(ap, fmt);
     vsprintf((char *)USART2_TX_BUF, fmt, ap);
     va_end(ap);
-    i = strlen((const char *)USART2_TX_BUF);                  //�˴η������ݵĳ���
 
-    for (j = 0; j < i; j++)                                   //ѭ����������
+    i = strlen((const char *)USART2_TX_BUF);
+
+    for (j = 0; j < i; j++)
     {
-        while (USART_GetFlagStatus(USART2, USART_FLAG_TC) == RESET); //�ȴ��ϴδ������
-
-        USART_SendData(USART2, (uint8_t)USART2_TX_BUF[j]); 	 //�������ݵ�����2
+        /* 等待上次发送完成 */
+        while (USART_GetFlagStatus(USART2, USART_FLAG_TC) == RESET);
+        USART_SendData(USART2, (uint8_t)USART2_TX_BUF[j]);
     }
-
 }
 
-
+#endif /* USE_STDPERIPH_DRIVER */
