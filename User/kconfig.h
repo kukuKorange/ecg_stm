@@ -81,9 +81,38 @@
 
 /**
  * @brief  心率报警阈值 (bpm)
- * @note   心率超过此值时LED2亮起
+ * @note   心率超过此值时LED2亮起并上报报警
  */
 #define HR_ALARM_THRESHOLD      70
+
+/**
+ * @brief  血氧报警阈值 (%)
+ * @note   血氧低于此值时上报报警
+ */
+#define SPO2_ALARM_THRESHOLD    95
+
+/**
+ * @brief  心率过低阈值 (bpm)
+ */
+#define HR_LOW_THRESHOLD        50
+
+/**
+ * @brief  心率过高阈值 (bpm)
+ */
+#define HR_HIGH_THRESHOLD       120
+
+/*============================================================================*/
+/*                              MQTT报警类型                                    */
+/*============================================================================*/
+
+/**
+ * @brief  报警类型定义 (与Python服务端保持一致)
+ */
+#define ALARM_TYPE_SPO2_LOW     0   /**< 血氧饱和度过低 */
+#define ALARM_TYPE_HR_HIGH      1   /**< 心率过高 */
+#define ALARM_TYPE_HR_LOW       2   /**< 心率过低 */
+#define ALARM_TYPE_TEMP_ABNORMAL 3  /**< 体温异常 */
+#define ALARM_TYPE_ECG_ABNORMAL 4   /**< 心电异常 */
 
 /*============================================================================*/
 /*                              硬件配置                                       */

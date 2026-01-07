@@ -27,18 +27,20 @@
 /*============================ WiFi配置 ============================*/
 
 #define WIFI_NAME           "5132"
-#define WIFI_PASSWORD       "53288837"
+#define WIFI_PASSWORD       "ttst4qrj"
 
 /*============================ MQTT通用配置 ============================*/
 
-/* MQTT主题 */
-#define MQTT_TOPIC_POST     "/ecg/data"
-#define MQTT_TOPIC_SUB      "/ecg/cmd"
-#define MQTT_PROPERTY_NAME  "heartrate"
+/* MQTT主题 (与Python服务端保持一致) */
+#define MQTT_TOPIC_VITAL    "ecg/vitalsign"   /**< 生命体征数据主题 */
+#define MQTT_TOPIC_ALARM    "ecg/alarm"       /**< 报警信息主题 */
+#define MQTT_TOPIC_SUB      "ecg/cmd"         /**< 订阅指令主题 */
 
 /* 兼容旧代码 */
-#define POST        MQTT_TOPIC_POST
-#define POST_NAME   MQTT_PROPERTY_NAME
+#define MQTT_TOPIC_POST     MQTT_TOPIC_VITAL
+#define POST                MQTT_TOPIC_POST
+#define MQTT_PROPERTY_NAME  "heartRate"
+#define POST_NAME           MQTT_PROPERTY_NAME
 
 /*============================ MQTT服务器配置 ============================*/
 
@@ -60,16 +62,14 @@
 /*--------------------- 自建服务器配置 ---------------------*/
 
 /* 服务器地址和端口 */
-#define MQTT_BROKER_HOST    "192.168.1.100"     /* 修改为你的服务器IP */
+#define MQTT_BROKER_HOST    "47.115.148.200"     /* 修改为你的服务器IP */
 #define MQTT_BROKER_PORT    "1883"
 
-/* 认证信息 (无认证可留空) */
-#define MQTT_USERNAME       ""                   /* 用户名，无认证留空 */
-#define MQTT_PASSWORD       ""                   /* 密码，无认证留空 */
-#define MQTT_CLIENT_ID      "ecg_stm32"          /* 客户端ID */
+/* 客户端配置 */
+#define MQTT_CLIENT_ID      "ecg_stm32_c8t6"     /* 客户端ID（必须唯一）*/
 
-/* MQTT AT指令 */
-#define MQTT_USERCFG    "AT+MQTTUSERCFG=0,1,\"" MQTT_CLIENT_ID "\",\"" MQTT_USERNAME "\",\"" MQTT_PASSWORD "\",0,0,\"\""
+/* MQTT AT指令 (无认证模式，用户名密码为空) */
+#define MQTT_USERCFG    "AT+MQTTUSERCFG=0,1,\"" MQTT_CLIENT_ID "\",\"\",\"\",0,0,\"\""
 #define MQTT_CLIENTID   ""  /* 自建服务器不需要单独设置ClientID */
 #define MQTT_CONN       "AT+MQTTCONN=0,\"" MQTT_BROKER_HOST "\"," MQTT_BROKER_PORT ",1"
 
@@ -108,11 +108,33 @@ uint8_t esp8266_send_cmd(char *cmd, char *ack, uint16_t waittime);
 uint8_t esp8266_check_cmd(char *str);
 
 /**
-  * @brief  向服务器发送数据
+  * @brief  向服务器发送数据（通用）
   * @param  property: 属性名称
   * @param  Data: 属性值
   */
 void ESP8266_Send(char *property, int Data);
+
+/**
+  * @brief  发送生命体征数据
+  * @param  heart_rate: 心率 (bpm)
+  * @param  spo2: 血氧饱和度 (%)
+  * @note   发送到 ecg/vitalsign 主题
+  *         JSON格式: {"heartRate":xx,"oxygenSaturation":xx}
+  */
+void ESP8266_SendVitalSign(uint16_t heart_rate, uint16_t spo2);
+
+/**
+  * @brief  发送报警信息
+  * @param  alarm_type: 报警类型
+  *         - 0: 血氧过低
+  *         - 1: 心率过高
+  *         - 2: 心率过低
+  *         - 3: 体温异常
+  *         - 4: 心电异常
+  * @param  severity: 严重程度 (1-5)
+  * @note   发送到 ecg/alarm 主题
+  */
+void ESP8266_SendAlarm(uint8_t alarm_type, uint8_t severity);
 
 /**
   * @brief  接收服务器下发数据

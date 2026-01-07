@@ -20,6 +20,7 @@
 #include "stm32f10x_rcc.h"
 #include "stm32f10x_tim.h"
 #include "ad8232.h"
+#include "esp8266.h"
 #include "key.h"
 #include "max30102.h"
 #include "max30102_fir.h"
@@ -92,16 +93,15 @@ extern volatile uint8_t debug_refresh_flag;  /**< 调试页面刷新标志 */
   */
 void TIM3_IRQHandler(void)
 {
-    if (TIM_GetITStatus(TIM3, TIM_IT_Update) == SET)
-    {
+    if (TIM_GetITStatus(TIM3, TIM_IT_Update) == SET){
         tim3_counter++;
         tim3_ms_counter++;  /* 毫秒计数器（用于循环时间测量） */
         
         /* 1Hz任务: 秒计数器 */
-        if (tim3_counter >= 100000)
-        {
+        if (tim3_counter >= 100000){
             test++;
             tim3_counter = 0;
+            ESP8266_Send("test", test);
         }
 		
 		/* 50Hz任务: 心率血氧数据采集 */
@@ -112,15 +112,13 @@ void TIM3_IRQHandler(void)
         
 #ifdef ENABLE_DEBUG_PAGE
         /* 10Hz任务: 调试页面刷新（仅在调试页面执行） */
-        if ((tim3_counter % 10000 == 0) && (current_page == PAGE_DEBUG))
-        {
+        if ((tim3_counter % 10000 == 0) && (current_page == PAGE_DEBUG)){
             debug_refresh_flag = 1;
         }
 #endif
         
         /* 200Hz任务: ECG采样与绘制（仅在心电图页面执行） */
-        if ((tim3_counter % 500 == 0) && (current_page == PAGE_ECG))
-        {
+        if ((tim3_counter % 500 == 0) && (current_page == PAGE_ECG)){
             ECG_SampleAndDraw();
         }
         

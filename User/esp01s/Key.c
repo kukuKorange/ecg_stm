@@ -24,8 +24,6 @@
 /*============================ 全局变量 ============================*/
 
 uint8_t current_page = PAGE_HEARTRATE;  /**< 当前页面，默认心率页面 */
-static uint8_t page_changed = 1;        /**< 页面切换标志，1表示需要刷新 */
-
 /*============================ 函数实现 ============================*/
 
 /**
@@ -109,7 +107,6 @@ void Key_Process(void)
             {
                 current_page = PAGE_MAX - 1;  /* 循环到最后一页 */
             }
-            page_changed = 1;
             OLED_Clear();  /* 清屏准备显示新页面 */
             break;
             
@@ -135,7 +132,6 @@ void Key_Process(void)
             {
                 current_page = 0;  /* 循环到第一页 */
             }
-            page_changed = 1;
             OLED_Clear();  /* 清屏准备显示新页面 */
             break;
             

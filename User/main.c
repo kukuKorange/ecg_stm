@@ -70,7 +70,7 @@ int main(void){
     
     usart2_init(115200);     /* 串口2初始化(PA2/PA3)为115200 esp-01s通信 */
     ESP8266_Init();
-
+    
     /* 心电图外设配置 */
     AD_Init();
     AD8232Init();

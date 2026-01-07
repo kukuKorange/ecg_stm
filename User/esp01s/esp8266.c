@@ -57,24 +57,38 @@ static void delay_ms(uint16_t ms)
 /**
   * @brief  ESP8266模块初始化
   * @note   初始化流程：
-  *         1. 设置Station模式（连接WiFi）
-  *         2. 软复位模块
+  *         1. 测试AT通信
+  *         2. 设置Station模式
   *         3. 连接WiFi路由器
-  *         4. 配置MQTT连接参数
+  *         4. 配置MQTT并连接服务器
   */
 void ESP8266_Init(void)
 {
+    uint8_t retry;
+    
+    /* 等待模块启动 */
+    delay_ms(2000);
+    
+    /* 测试AT通信 */
+    for (retry = 0; retry < 3; retry++)
+    {
+        if (esp8266_send_cmd("AT", "OK", 50) == 0)
+            break;
+        delay_ms(500);
+    }
+    
     /* 设置WiFi工作模式为Station模式 */
     esp8266_send_cmd("AT+CWMODE=1", "OK", 50);
     
     /* 软复位模块 */
     esp8266_send_cmd("AT+RST", "ready", 20);
-    delay_ms(1000);
+    delay_ms(2000);  /* 等待复位完成 */
     
-    /* 连接WiFi路由器 */
-    esp8266_send_cmd("AT+CWJAP=\"" WIFI_NAME "\",\"" WIFI_PASSWORD "\"", "WIFI GOT IP", 300);
+    /* 连接WiFi路由器（必须！超时设为15秒）*/
+    esp8266_send_cmd("AT+CWJAP=\"" WIFI_NAME "\",\"" WIFI_PASSWORD "\"", "GOT IP", 1500);
+    delay_ms(2000);  /* 等待网络稳定 */
     
-    /* 配置MQTT用户信息 */
+    /* 配置MQTT用户信息（必须在MQTTCONN之前！）*/
     esp8266_send_cmd(MQTT_USERCFG, "OK", 100);
     
 #if (MQTT_USE_ALIYUN == 1)
@@ -96,29 +110,27 @@ void ESP8266_Init(void)
   */
 uint8_t esp8266_send_cmd(char *cmd, char *ack, uint16_t waittime)
 {
-    uint8_t res = 0;
+    uint8_t res = 1;  /* 默认失败 */
     
     USART2_RX_STA = 0;
     u2_printf("%s\r\n", cmd);
     
-    if (waittime)
+    if (ack == NULL || waittime == 0)
     {
-        while (--waittime)
+        return 0;  /* 不需要等待应答 */
+    }
+    
+    while (waittime--)
+    {
+        delay_ms(10);
+        if (USART2_RX_STA & 0x8000)
         {
-            delay_ms(10);
-            if (USART2_RX_STA & 0x8000)
+            if (esp8266_check_cmd(ack))
             {
-                /* TODO: 启用应答检查 */
-                // if (esp8266_check_cmd(ack))
-                // {
-                //     break;
-                // }
-                USART2_RX_STA = 0;
+                res = 0;  /* 收到期望应答，成功 */
+                break;
             }
-        }
-        if (waittime == 0)
-        {
-            res = 1;
+            USART2_RX_STA = 0;  /* 清除后继续等待 */
         }
     }
     
@@ -145,7 +157,7 @@ uint8_t esp8266_check_cmd(char *str)
 }
 
 /**
-  * @brief  向云端发送数据
+  * @brief  向云端发送数据（通用）
   * @param  property: 属性名称
   * @param  Data: 属性值（整数）
   * @note   发送格式：AT+MQTTPUB=0,"topic","{\"property\":data}",1,0
@@ -154,6 +166,34 @@ void ESP8266_Send(char *property, int Data)
 {
     USART2_RX_STA = 0;
     u2_printf("AT+MQTTPUB=0,\"%s\",\"{\\\"%s\\\":%d}\",1,0\r\n", MQTT_TOPIC_POST, property, Data);
+}
+
+/**
+  * @brief  发送生命体征数据
+  * @param  heart_rate: 心率 (bpm)
+  * @param  spo2: 血氧饱和度 (%)
+  * @note   JSON格式与Python服务端保持一致:
+  *         {"heartRate":xx,"oxygenSaturation":xx}
+  */
+void ESP8266_SendVitalSign(uint16_t heart_rate, uint16_t spo2)
+{
+    USART2_RX_STA = 0;
+    u2_printf("AT+MQTTPUB=0,\"%s\",\"{\\\"heartRate\\\":%d,\\\"oxygenSaturation\\\":%d}\",1,0\r\n",
+              MQTT_TOPIC_VITAL, heart_rate, spo2);
+}
+
+/**
+  * @brief  发送报警信息
+  * @param  alarm_type: 报警类型 (0-4)
+  * @param  severity: 严重程度 (1-5)
+  * @note   JSON格式与Python服务端保持一致:
+  *         {"type":x,"severity":x}
+  */
+void ESP8266_SendAlarm(uint8_t alarm_type, uint8_t severity)
+{
+    USART2_RX_STA = 0;
+    u2_printf("AT+MQTTPUB=0,\"%s\",\"{\\\"type\\\":%d,\\\"severity\\\":%d}\",1,0\r\n",
+              MQTT_TOPIC_ALARM, alarm_type, severity);
 }
 
 /**
