@@ -340,7 +340,7 @@
               <MiscControls></MiscControls>
               <Define>USE_HAL_DRIVER,STM32F103xB,ARM_MATH_CM3,USE_STDPERIPH_DRIVER,STM32F10X_MD</Define>
               <Undefine></Undefine>
-              <IncludePath>..\User;..\Drivers\STM32F1xx_HAL_Driver\Inc;..\Drivers\STM32F1xx_HAL_Driver\Inc\Legacy;..\Drivers\CMSIS\Include;..\Drivers\CMSIS\Device\ST\STM32F1xx\Include;..\User\max30102;..\Drivers\CMSIS\DSP\Include;..\Drivers\CMSIS\Lib\ARM;..\User\oled;..\Drivers\driver_basic;..\Drivers\driver_basic\inc;..\User\esp01s;..\User\ad8232;..\User\module\display</IncludePath>
+              <IncludePath>..\User;..\Drivers\STM32F1xx_HAL_Driver\Inc;..\Drivers\STM32F1xx_HAL_Driver\Inc\Legacy;..\Drivers\CMSIS\Include;..\Drivers\CMSIS\Device\ST\STM32F1xx\Include;..\User\max30102;..\Drivers\CMSIS\DSP\Include;..\Drivers\CMSIS\Lib\ARM;..\User\oled;..\Drivers\driver_basic;..\Drivers\driver_basic\inc;..\User\esp01s;..\User\ad8232;..\User\module\display;..\User\module\transmit</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -578,6 +578,11 @@
               <FileName>display.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\module\display\display.c</FilePath>
+            </File>
+            <File>
+              <FileName>transmit.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\module\transmit\transmit.c</FilePath>
             </File>
           </Files>
         </Group>

@@ -24,6 +24,7 @@
 #include "key.h"
 #include "max30102.h"
 #include "max30102_fir.h"
+#include "module/transmit/transmit.h"
 
 /*============================ 私有变量 ============================*/
 
@@ -97,18 +98,22 @@ void TIM3_IRQHandler(void)
         tim3_counter++;
         tim3_ms_counter++;  /* 毫秒计数器（用于循环时间测量） */
         
-        /* 1Hz任务: 秒计数器 */
+        /* 1Hz任务: 秒计数器 + 传输模块回调 */
         if (tim3_counter >= 100000){
             test++;
             tim3_counter = 0;
-            ESP8266_Send("test", test);
+            Transmit_TimerCallback();  /* 每秒调用一次传输模块 */
         }
 		
-		/* 50Hz任务: 心率血氧数据采集 */
-		if(tim3_counter % 2000 == 0){
-			/* ==================== 心率血氧数据采集 ==================== */
-			MAX30102_Process();
+		/* 50Hz任务: 心率血氧采集（非ECG页面执行） */
+		if ((tim3_counter % 2000 == 0) && (current_page != PAGE_ECG)){
+			max30102_process_flag = 1;
 		}
+        
+        /* 200Hz任务: ECG采样与绘制（仅在心电图页面执行） */
+        if ((tim3_counter % 500 == 0) && (current_page == PAGE_ECG)){
+            ECG_SampleAndDraw();
+        }
         
 #ifdef ENABLE_DEBUG_PAGE
         /* 10Hz任务: 调试页面刷新（仅在调试页面执行） */
@@ -116,11 +121,6 @@ void TIM3_IRQHandler(void)
             debug_refresh_flag = 1;
         }
 #endif
-        
-        /* 200Hz任务: ECG采样与绘制（仅在心电图页面执行） */
-        if ((tim3_counter % 500 == 0) && (current_page == PAGE_ECG)){
-            ECG_SampleAndDraw();
-        }
         
         /* 清除中断标志 */
         TIM_ClearITPendingBit(TIM3, TIM_IT_Update);

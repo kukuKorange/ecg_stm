@@ -27,6 +27,7 @@
 #include "max30102.h"
 #include "max30102_fir.h"
 #include "module/display/display.h"
+#include "module/transmit/transmit.h"
 
 /* =========================================函数声明区====================================== */
 
@@ -70,6 +71,7 @@ int main(void){
     
     usart2_init(115200);     /* 串口2初始化(PA2/PA3)为115200 esp-01s通信 */
     ESP8266_Init();
+    Transmit_Init();         /* 传输模块初始化 */
     
     /* 心电图外设配置 */
     AD_Init();
@@ -88,6 +90,13 @@ int main(void){
         /* ==================== 按键处理 ==================== */
         Key_Process();
         
+        /* ==================== 心率血氧数据采集（50Hz，由定时器触发） ==================== */
+        if (max30102_process_flag)
+        {
+            max30102_process_flag = 0;
+            MAX30102_Process();
+        }
+        
         /* ==================== 页面显示更新 ==================== */
         Display_Update();
         
@@ -95,6 +104,9 @@ int main(void){
 #ifdef ENABLE_LED_INDICATOR
         LED_StatusUpdate();
 #endif
+        
+        /* ==================== 数据传输处理 ==================== */
+        Transmit_Process();
         
 #ifdef ENABLE_DEBUG_PAGE
         /* ==================== 计算循环时间（使用TIM3的100kHz计数器） ==================== */
