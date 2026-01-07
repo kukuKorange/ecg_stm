@@ -5,8 +5,12 @@
   * 
   * @details 通过AT指令控制ESP8266模块，实现：
   *          - WiFi Station模式连接路由器
-  *          - MQTT协议连接阿里云IoT平台
-  *          - 传感器数据上传与云端指令接收
+  *          - MQTT协议连接服务器（支持阿里云IoT/自建服务器）
+  *          - 传感器数据上传与服务器指令接收
+  * 
+  * @note    在esp8266.h中设置 MQTT_USE_ALIYUN 选择服务器模式：
+  *          - 0: 自建MQTT服务器 (Mosquitto/EMQX等)
+  *          - 1: 阿里云IoT平台
   ******************************************************************************
   */
 
@@ -67,17 +71,19 @@ void ESP8266_Init(void)
     esp8266_send_cmd("AT+RST", "ready", 20);
     delay_ms(1000);
     
-    /* 连接WiFi路由器 (SSID: 5132, 密码: 53288837) */
-    esp8266_send_cmd("AT+CWJAP=\"5132\",\"53288837\"", "WIFI GOT IP", 300);
+    /* 连接WiFi路由器 */
+    esp8266_send_cmd("AT+CWJAP=\"" WIFI_NAME "\",\"" WIFI_PASSWORD "\"", "WIFI GOT IP", 300);
     
     /* 配置MQTT用户信息 */
-    esp8266_send_cmd(MQTT_set, "OK", 100);
+    esp8266_send_cmd(MQTT_USERCFG, "OK", 100);
     
-    /* 配置MQTT客户端ID */
-    esp8266_send_cmd(MQTT_Client, "OK", 100);
+#if (MQTT_USE_ALIYUN == 1)
+    /* 阿里云需要单独设置ClientID */
+    esp8266_send_cmd(MQTT_CLIENTID, "OK", 100);
+#endif
     
     /* 连接MQTT服务器 */
-    esp8266_send_cmd(MQTT_Pass, "OK", 300);
+    esp8266_send_cmd(MQTT_CONN, "OK", 300);
 }
 
 /**
@@ -147,7 +153,7 @@ uint8_t esp8266_check_cmd(char *str)
 void ESP8266_Send(char *property, int Data)
 {
     USART2_RX_STA = 0;
-    u2_printf("AT+MQTTPUB=0,\"%s\",\"{\\\"%s\\\":%d}\",1,0\r\n", post, property, Data);
+    u2_printf("AT+MQTTPUB=0,\"%s\",\"{\\\"%s\\\":%d}\",1,0\r\n", MQTT_TOPIC_POST, property, Data);
 }
 
 /**
