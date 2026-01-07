@@ -21,15 +21,27 @@
 /*                              外部变量声明                                   */
 /*============================================================================*/
 
+/* 页面控制（来自Key.c） */
+extern uint8_t current_page;
+
 #ifdef ENABLE_DEBUG_PAGE
 /* 调试数据（来自main.c） */
 extern uint32_t display_loop_time_ms;      /**< 循环时间 (10us) */
 extern uint32_t display_loop_time_max_ms;  /**< 最大循环时间 (10us) */
+
+/* 调试页面刷新标志（来自main.c） */
+extern volatile uint8_t debug_refresh_flag;
 #endif
 
 /*============================================================================*/
 /*                              函数声明                                       */
 /*============================================================================*/
+
+/**
+ * @brief  显示更新（主入口函数）
+ * @note   处理页面切换检测并调用对应页面显示函数
+ */
+void Display_Update(void);
 
 /**
  * @brief  页面0: 心率血氧显示

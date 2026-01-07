@@ -11,6 +11,62 @@
 #include "oled.h"
 #include "ad8232.h"
 #include "AD.h"
+#include "Key.h"
+
+/*============================================================================*/
+/*                              私有变量                                       */
+/*============================================================================*/
+
+static uint8_t last_page = 0xFF;  /**< 上一次的页面，用于检测页面切换 */
+
+/*============================================================================*/
+/*                              显示更新（主入口）                              */
+/*============================================================================*/
+
+/**
+ * @brief  显示更新
+ * @note   处理页面切换检测并调用对应页面显示函数
+ */
+void Display_Update(void)
+{
+    /* 页面切换检测 */
+    if (current_page != last_page)
+    {
+        OLED_Clear();
+        last_page = current_page;
+#ifdef ENABLE_DEBUG_PAGE
+        extern uint32_t display_loop_time_max_ms;
+        display_loop_time_max_ms = 0;  /* 切换页面时重置最大时间 */
+#endif
+    }
+    
+    /* 根据当前页面显示内容 */
+    switch (current_page)
+    {
+        case PAGE_HEARTRATE:
+            Display_Page0_HeartRate();
+            break;
+            
+        case PAGE_ECG:
+            Display_Page1_ECG();
+            break;
+            
+#ifdef ENABLE_DEBUG_PAGE
+        case PAGE_DEBUG:
+            /* 调试页面：10Hz刷新 */
+            if (debug_refresh_flag)
+            {
+                debug_refresh_flag = 0;
+                Display_Page2_Debug();
+            }
+            break;
+#endif
+            
+        default:
+            current_page = PAGE_HEARTRATE;
+            break;
+    }
+}
 
 /*============================================================================*/
 /*                              页面0: 心率血氧显示                            */

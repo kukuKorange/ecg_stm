@@ -34,8 +34,6 @@ void SystemClock_Config(void);
 
 /* =========================================变量定义区====================================== */
 
-static uint8_t last_page = 0xFF;  /* 上一次的页面，用于检测页面切换 */
-
 #ifdef ENABLE_DEBUG_PAGE
 /* 调试页面刷新控制 */
 volatile uint8_t debug_refresh_flag = 0;  /* 调试页面刷新标志（由定时器置位） */
@@ -51,8 +49,7 @@ uint32_t display_loop_time_max_ms = 0;          /* 最大循环时间（10us）-
  * @param  无
  * @retval 无
  */
-int main(void)
-{
+int main(void){
     /* 配置NVIC优先级分组 */
     NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
     
@@ -82,8 +79,7 @@ int main(void)
     /* 按键初始化 */
     Key_Init();
     
-    while(1)
-    {
+    while(1){
 #ifdef ENABLE_DEBUG_PAGE
         /* ==================== 记录循环开始时间（使用TIM3的ms计数器） ==================== */
         loop_start_ms = tim3_ms_counter;
@@ -92,42 +88,8 @@ int main(void)
         /* ==================== 按键处理 ==================== */
         Key_Process();
         
-        /* ==================== 页面切换检测 ==================== */
-        if (current_page != last_page)
-        {
-            OLED_Clear();
-            last_page = current_page;
-#ifdef ENABLE_DEBUG_PAGE
-            display_loop_time_max_ms = 0;  /* 切换页面时重置最大时间 */
-#endif
-        }
-        
-        /* ==================== 根据当前页面显示内容 ==================== */
-        switch (current_page)
-        {
-            case PAGE_HEARTRATE:
-                Display_Page0_HeartRate();
-                break;
-                
-            case PAGE_ECG:
-                Display_Page1_ECG();
-                break;
-                
-#ifdef ENABLE_DEBUG_PAGE
-            case PAGE_DEBUG:
-                /* 调试页面：10Hz刷新 */
-                if (debug_refresh_flag)
-                {
-                    debug_refresh_flag = 0;
-                    Display_Page2_Debug();
-                }
-                break;
-#endif
-                
-            default:
-                current_page = PAGE_HEARTRATE;
-                break;
-        }
+        /* ==================== 页面显示更新 ==================== */
+        Display_Update();
         
         /* ==================== LED状态指示 ==================== */
 #ifdef ENABLE_LED_INDICATOR
@@ -139,8 +101,7 @@ int main(void)
         display_loop_time_ms = tim3_ms_counter - loop_start_ms;
         
         /* 更新最大循环时间 */
-        if (display_loop_time_ms > display_loop_time_max_ms)
-        {
+        if (display_loop_time_ms > display_loop_time_max_ms){
             display_loop_time_max_ms = display_loop_time_ms;
         }
 #endif
