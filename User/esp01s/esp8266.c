@@ -22,6 +22,7 @@
 #include "usart2.h"
 #include "string.h"
 #include "stdint.h"
+#include "stdio.h"
 
 /*============================ 宏定义 ============================*/
 
@@ -178,6 +179,25 @@ void ESP8266_Send(char *property, int Data)
 {
     USART2_RX_STA = 0;
     u2_printf("AT+MQTTPUB=0,\"%s\",\"{\\\"%s\\\":%d}\",1,0\r\n", MQTT_TOPIC_POST, property, Data);
+}
+
+/**
+  * @brief  发送ECG单点数据
+  * @param  timestamp: 时间戳（未使用）
+  * @param  data: ECG数据数组
+  * @param  count: 数据点数
+  * @note   每10ms发送1个数据点
+  */
+void ESP8266_SendECGBatch(uint32_t timestamp, uint16_t *data, uint8_t count)
+{
+    (void)timestamp;
+    
+    if (count == 0)
+    {
+        return;
+    }
+    
+    ESP8266_SendToTopic(MQTT_TOPIC_ECG, data[0]);
 }
 
 /**

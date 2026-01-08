@@ -113,13 +113,10 @@ void Key_Process(void)
         case 2:  /* Key2: 功能键 - 上传心电数据 */
             if (current_page == PAGE_ECG)
             {
-                TIM_Cmd(TIM3, DISABLE);
-                uint8_t cnt;
-                for (cnt = 0; cnt < 120; cnt++)
-                {
-                    // ESP8266_Send("HeartMap", 80 - map_upload[cnt]);
-                }
-                TIM_Cmd(TIM3, ENABLE);
+                /* 开始ECG批量上传（使用当前秒数作为时间戳） */
+                extern uint16_t test;  /* 秒计数器 */
+                extern void Transmit_StartECGUpload(uint32_t timestamp);
+                Transmit_StartECGUpload(test);
             }
             break;
             

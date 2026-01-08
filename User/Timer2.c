@@ -78,7 +78,8 @@ void Timer3_Init(void)
 
 /*============================ 外部变量 ============================*/
 
-extern volatile uint8_t display_refresh_flag;  /**< 10Hz显示刷新标志 */
+extern volatile uint8_t display_refresh_flag;  /**< 5Hz显示刷新标志 */
+extern volatile uint8_t ecg_upload_flag;       /**< 10Hz ECG上传标志 */
 
 #ifdef ENABLE_DEBUG_PAGE
 extern volatile uint8_t debug_refresh_flag;  /**< 调试页面刷新标志 */
@@ -120,6 +121,11 @@ void TIM3_IRQHandler(void)
         /* 5Hz任务: 心率页面显示刷新 */
         if (tim3_counter % 20000 == 0){
             display_refresh_flag = 1;
+        }
+        
+        /* 100Hz任务: ECG上传触发（每10ms发送一批，实时传输） */
+        if (tim3_counter % 1000 == 0){
+            ecg_upload_flag = 1;
         }
         
 #ifdef ENABLE_DEBUG_PAGE

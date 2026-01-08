@@ -12,6 +12,7 @@
 #include "transmit.h"
 #include "esp8266.h"
 #include "max30102.h"
+#include "ad8232.h"
 
 /*============================================================================*/
 /*                              私有变量                                       */
@@ -20,12 +21,17 @@
 static uint16_t transmit_counter = 0;   /**< 传输计时器 (秒) */
 static uint16_t alarm_counter = 0;      /**< 报警检测计时器 (秒) */
 
+/* ECG上传相关 */
+static uint16_t ecg_batch_buffer[1];    /**< ECG批次缓冲区 */
+static uint32_t ecg_batch_timestamp = 0; /**< 批次时间戳 */
+
 /*============================================================================*/
 /*                              全局变量                                       */
 /*============================================================================*/
 
 volatile uint8_t transmit_flag = 0;     /**< 传输触发标志 */
 volatile uint8_t alarm_check_flag = 0;  /**< 报警检测标志 */
+volatile uint8_t ecg_upload_flag = 0;   /**< ECG上传触发标志（100ms一次） */
 
 /*============================================================================*/
 /*                              函数实现                                       */
@@ -150,5 +156,71 @@ void Transmit_TimerCallback(void)
         alarm_counter = 0;
         alarm_check_flag = 1;
     }
+}
+
+/*============================================================================*/
+/*                              ECG上传功能                                    */
+/*============================================================================*/
+
+/**
+ * @brief  开始ECG上传（由按键触发）
+ * @param  timestamp: 当前时间戳
+ */
+void Transmit_StartECGUpload(uint32_t timestamp)
+{
+    ecg_batch_timestamp = timestamp;
+    ECG_StartUpload(timestamp);
+}
+
+/**
+ * @brief  ECG上传处理（在主循环中调用）
+ * @note   每100ms发送一批数据（20个采样点）
+ */
+void Transmit_ECGUploadProcess(void)
+{
+    uint16_t count;
+    
+    /* 检查是否有上传任务 */
+    if (ECG_IsUploadComplete())
+    {
+        return;
+    }
+    
+    /* 检查上传标志（100ms触发一次） */
+    if (!ecg_upload_flag)
+    {
+        return;
+    }
+    ecg_upload_flag = 0;
+    
+    /* 获取一批数据 */
+    count = ECG_GetUploadBatch(ecg_batch_buffer, 1);
+    
+    if (count > 0)
+    {
+        /* 发送到MQTT */
+        ESP8266_SendECGBatch(ecg_batch_timestamp, ecg_batch_buffer, (uint8_t)count);
+        
+        /* 更新时间戳（每批20个点，200Hz采样 = 100ms） */
+        ecg_batch_timestamp += 10;  /* 1点，每10ms发送 */
+    }
+}
+
+/**
+ * @brief  获取ECG上传进度
+ * @retval 进度百分比 (0-100)
+ */
+uint8_t Transmit_GetECGProgress(void)
+{
+    return ECG_GetUploadProgress();
+}
+
+/**
+ * @brief  检查ECG上传是否完成
+ * @retval 1: 完成, 0: 进行中
+ */
+uint8_t Transmit_IsECGUploadComplete(void)
+{
+    return ECG_IsUploadComplete();
 }
 

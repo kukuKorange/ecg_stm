@@ -111,6 +111,9 @@ int main(void){
         /* ==================== 数据传输处理 ==================== */
         Transmit_Process();
         
+        /* ==================== ECG上传处理（按键触发后分批上传） ==================== */
+        Transmit_ECGUploadProcess();
+        
 #ifdef ENABLE_DEBUG_PAGE
         /* ==================== 计算循环时间（使用TIM3的100kHz计数器） ==================== */
         display_loop_time_ms = tim3_ms_counter - loop_start_ms;

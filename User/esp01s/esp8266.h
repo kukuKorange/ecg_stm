@@ -125,6 +125,16 @@ void ESP8266_SendToTopic(const char *topic, int Data);
 void ESP8266_Send(char *property, int Data);
 
 /**
+  * @brief  发送ECG批量数据
+  * @param  timestamp: 时间戳
+  * @param  data: ECG数据数组
+  * @param  count: 数据点数（最多20个）
+  * @note   发送到 health/ecg 主题
+  *         JSON格式: {"ts":123456,"data":[1234,1235,...]}
+  */
+void ESP8266_SendECGBatch(uint32_t timestamp, uint16_t *data, uint8_t count);
+
+/**
   * @brief  发送生命体征数据
   * @param  heart_rate: 心率 (bpm)
   * @param  spo2: 血氧饱和度 (%)

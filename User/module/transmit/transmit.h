@@ -84,5 +84,34 @@ void Transmit_CheckAlarm(void);
  */
 void Transmit_TimerCallback(void);
 
+/*============================ ECG上传接口 ============================*/
+
+/* ECG上传标志（由定时器设置，100ms一次） */
+extern volatile uint8_t ecg_upload_flag;
+
+/**
+ * @brief  开始ECG上传（由按键触发）
+ * @param  timestamp: 当前时间戳
+ */
+void Transmit_StartECGUpload(uint32_t timestamp);
+
+/**
+ * @brief  ECG上传处理（在主循环中调用）
+ * @note   每100ms发送一批数据（20个采样点）
+ */
+void Transmit_ECGUploadProcess(void);
+
+/**
+ * @brief  获取ECG上传进度
+ * @retval 进度百分比 (0-100)
+ */
+uint8_t Transmit_GetECGProgress(void);
+
+/**
+ * @brief  检查ECG上传是否完成
+ * @retval 1: 完成, 0: 进行中
+ */
+uint8_t Transmit_IsECGUploadComplete(void);
+
 #endif /* __TRANSMIT_H */
 

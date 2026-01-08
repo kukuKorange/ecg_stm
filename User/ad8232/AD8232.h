@@ -16,6 +16,11 @@ extern uint16_t map_upload[130];    /**< 上传数据缓冲区 */
 extern uint16_t ecg_index;          /**< ECG数据索引 */
 extern uint16_t test;               /**< 测试计数器 */
 
+/* ECG上传相关 */
+extern uint16_t ecg_upload_buffer[];     /**< ECG上传缓存 */
+extern uint16_t ecg_upload_write_idx;    /**< 写入索引 */
+extern uint8_t  ecg_upload_active;       /**< 上传进行中标志 */
+
 /*============================ 函数声明 ============================*/
 
 /**
@@ -61,5 +66,44 @@ void DrawChart(uint16_t Chart[], uint8_t Width);
  * @param  Chart: 输出数据
  */
 void ChartOptimize(uint16_t *R, uint16_t *Chart);
+
+/*============================ ECG上传接口 ============================*/
+
+/**
+ * @brief  开始ECG数据上传
+ * @param  timestamp: 数据起始时间戳
+ */
+void ECG_StartUpload(uint32_t timestamp);
+
+/**
+ * @brief  停止ECG数据上传
+ */
+void ECG_StopUpload(void);
+
+/**
+ * @brief  获取待上传的数据量
+ * @retval 缓存中的数据点数
+ */
+uint16_t ECG_GetUploadDataCount(void);
+
+/**
+ * @brief  获取一批ECG数据用于上传
+ * @param  batch_data: 输出缓冲区
+ * @param  batch_size: 请求的批次大小
+ * @retval 实际获取的数据点数
+ */
+uint16_t ECG_GetUploadBatch(uint16_t *batch_data, uint16_t batch_size);
+
+/**
+ * @brief  获取上传进度
+ * @retval 进度百分比 (0-100)
+ */
+uint8_t ECG_GetUploadProgress(void);
+
+/**
+ * @brief  检查上传是否完成
+ * @retval 1: 完成, 0: 进行中
+ */
+uint8_t ECG_IsUploadComplete(void);
 
 #endif

@@ -22,14 +22,26 @@
 
 /*============================ 全局变量 ============================*/
 
-uint16_t ecg_data[500] = {0};   /**< ECG数据缓冲区 */
-uint16_t map_upload[130] = {0}; /**< 上传数据缓冲区 */
+uint16_t ecg_data[500] = {0};   /**< ECG数据缓冲区（显示用，已缩放） */
+uint16_t map_upload[130] = {0}; /**< 上传数据缓冲区（旧版兼容） */
 uint16_t ecg_index = 1;         /**< ECG数据索引 */
 uint16_t test = 0;              /**< 测试计数器（秒） */
 
+/*============================ ECG上传缓存 ============================*/
+
+#define ECG_UPLOAD_BUFFER_SIZE  600   /**< 上传缓存大小（3秒 @ 200Hz） */
+#define ECG_UPLOAD_BATCH_SIZE   1     /**< 每批上传点数 */
+
+uint16_t ecg_upload_buffer[ECG_UPLOAD_BUFFER_SIZE];  /**< ECG原始数据上传缓存 */
+uint16_t ecg_upload_write_idx = 0;    /**< 写入索引 */
+uint16_t ecg_upload_read_idx = 0;     /**< 上传读取索引 */
+uint8_t  ecg_upload_active = 0;       /**< 上传进行中标志 */
+uint32_t ecg_upload_timestamp = 0;    /**< 上传数据起始时间戳 */
+
 /*============================ 私有变量 ============================*/
 
-static uint16_t draw_x = 0;     /**< 绘图X坐标 */
+static uint16_t draw_x = 0;           /**< 绘图X坐标 */
+static uint16_t last_filtered = 2048; /**< 上一次滤波值（用于上传数据滤波）*/
 
 /*============================ 函数实现 ============================*/
 
@@ -86,38 +98,45 @@ uint8_t GetConnect(void)
   *         
   *         数据处理流程:
   *         1. 读取ADC值
-  *         2. 数据缩放（适配OLED显示范围）
-  *         3. 低通滤波（平滑曲线）
-  *         4. 绘制波形线段
-  *         5. 到达屏幕边缘后清屏重绘
+  *         2. 低通滤波
+  *         3. 保存滤波后数据到上传缓存
+  *         4. 数据缩放并绘制波形
   */
 void ECG_SampleAndDraw(void)
 {
+    uint16_t adc_raw;
+    uint16_t filtered;
+    
     /* 注意: 调用前需在Timer2.c中判断 current_page == PAGE_ECG */
     
+    /* 1. 读取ADC原始值 */
+    adc_raw = AD_GetValue();
+    
+    /* 2. 低通滤波: y = y_last + 0.25 * (y_new - y_last) */
+    filtered = last_filtered + (int16_t)(adc_raw - last_filtered) * 0.25f;
+    last_filtered = filtered;
+    
+    /* 3. 保存滤波后数据到上传缓存 */
+    if (!ecg_upload_active)  /* 上传过程中不覆盖数据 */
+    {
+        ecg_upload_buffer[ecg_upload_write_idx] = filtered;
+        ecg_upload_write_idx++;
+        if (ecg_upload_write_idx >= ECG_UPLOAD_BUFFER_SIZE)
+        {
+            ecg_upload_write_idx = 0;
+        }
+    }
+    
+    /* 4. 绘制波形 */
     if (ecg_index < 120)
     {
-        /* 1. 读取ADC值并缩放 */
-        /* ADC值范围0-4095，缩放到OLED Y轴范围(约10-55) */
-        ecg_data[ecg_index] = 90 - AD_GetValue() / 45;
-        
-        /* 2. 边界处理 */
+        /* 数据缩放（适配OLED Y轴范围10-55） */
+        ecg_data[ecg_index] = 90 - filtered / 45;
         ecg_data[0] = ecg_data[1];
         
-        /* 3. 低通滤波: y = y_last + 0.25 * (y_new - y_last) */
-        /* 滤波系数0.25，平滑曲线，减少抖动 */
-        ecg_data[ecg_index] = ecg_data[ecg_index - 1] + 
-                              (ecg_data[ecg_index] - ecg_data[ecg_index - 1]) * 0.25f;
-        
-        /* 4. 绘制波形线段 */
+        /* 绘制波形线段 */
         OLED_DrawLine(draw_x + 3, ecg_data[ecg_index - 1], 
                       draw_x + 4, ecg_data[ecg_index]);
-        
-        /* 5. 保存到上传缓冲区 */
-        if (ecg_index < 120)
-        {
-            map_upload[ecg_index] = ecg_data[ecg_index];
-        }
         
         ecg_index++;
         draw_x += 1;
@@ -226,6 +245,110 @@ void ChartOptimize(uint16_t *R, uint16_t *Chart)
         }
         j += 2;
     }
+}
+
+/*============================================================================*/
+/*                              ECG上传功能                                    */
+/*============================================================================*/
+
+/**
+  * @brief  开始ECG数据上传
+  * @param  timestamp: 数据起始时间戳
+  * @note   调用后，ECG_UploadProcess() 会分批上传数据
+  */
+void ECG_StartUpload(uint32_t timestamp)
+{
+    ecg_upload_timestamp = timestamp;
+    ecg_upload_read_idx = 0;
+    ecg_upload_active = 1;
+}
+
+/**
+  * @brief  停止ECG数据上传
+  */
+void ECG_StopUpload(void)
+{
+    ecg_upload_active = 0;
+    ecg_upload_read_idx = 0;
+}
+
+/**
+  * @brief  获取待上传的数据量
+  * @retval 缓存中的数据点数
+  */
+uint16_t ECG_GetUploadDataCount(void)
+{
+    return ecg_upload_write_idx;
+}
+
+/**
+  * @brief  获取一批ECG数据用于上传
+  * @param  batch_data: 输出缓冲区（至少20个元素）
+  * @param  batch_size: 请求的批次大小
+  * @retval 实际获取的数据点数（0表示上传完成）
+  */
+uint16_t ECG_GetUploadBatch(uint16_t *batch_data, uint16_t batch_size)
+{
+    uint16_t i;
+    uint16_t count = 0;
+    uint16_t available;
+    
+    if (!ecg_upload_active)
+    {
+        return 0;
+    }
+    
+    /* 计算剩余数据量 */
+    available = ecg_upload_write_idx - ecg_upload_read_idx;
+    if (available == 0)
+    {
+        /* 上传完成 */
+        ecg_upload_active = 0;
+        return 0;
+    }
+    
+    /* 限制批次大小 */
+    if (batch_size > available)
+    {
+        batch_size = available;
+    }
+    if (batch_size > ECG_UPLOAD_BATCH_SIZE)
+    {
+        batch_size = ECG_UPLOAD_BATCH_SIZE;
+    }
+    
+    /* 复制数据 */
+    for (i = 0; i < batch_size; i++)
+    {
+        batch_data[i] = ecg_upload_buffer[ecg_upload_read_idx + i];
+        count++;
+    }
+    
+    ecg_upload_read_idx += count;
+    
+    return count;
+}
+
+/**
+  * @brief  获取上传进度
+  * @retval 进度百分比 (0-100)
+  */
+uint8_t ECG_GetUploadProgress(void)
+{
+    if (ecg_upload_write_idx == 0)
+    {
+        return 100;
+    }
+    return (uint8_t)((ecg_upload_read_idx * 100) / ecg_upload_write_idx);
+}
+
+/**
+  * @brief  检查上传是否完成
+  * @retval 1: 上传完成或未开始, 0: 上传进行中
+  */
+uint8_t ECG_IsUploadComplete(void)
+{
+    return !ecg_upload_active;
 }
 
 #endif
