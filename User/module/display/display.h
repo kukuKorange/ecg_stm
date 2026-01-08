@@ -24,6 +24,9 @@
 /* 页面控制（来自Key.c） */
 extern uint8_t current_page;
 
+/* 10Hz显示刷新标志（来自main.c，由Timer3置位） */
+extern volatile uint8_t display_refresh_flag;
+
 #ifdef ENABLE_DEBUG_PAGE
 /* 调试数据（来自main.c） */
 extern uint32_t display_loop_time_ms;      /**< 循环时间 (10us) */

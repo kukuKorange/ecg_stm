@@ -35,6 +35,9 @@ void SystemClock_Config(void);
 
 /* =========================================变量定义区====================================== */
 
+/* 10Hz显示刷新标志（由定时器置位） */
+volatile uint8_t display_refresh_flag = 0;
+
 #ifdef ENABLE_DEBUG_PAGE
 /* 调试页面刷新控制 */
 volatile uint8_t debug_refresh_flag = 0;  /* 调试页面刷新标志（由定时器置位） */

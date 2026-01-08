@@ -17,7 +17,13 @@
 /*                              私有变量                                       */
 /*============================================================================*/
 
-static uint8_t last_page = 0xFF;  /**< 上一次的页面，用于检测页面切换 */
+static uint8_t last_page = 0xFF;          /**< 上一次的页面，用于检测页面切换 */
+
+/* 页面0局部刷新相关 */
+static uint8_t  page0_static_drawn = 0;   /**< 页面0静态内容是否已绘制 */
+static uint16_t last_hr = 0xFFFF;         /**< 上次心率值 */
+static uint16_t last_spo2 = 0xFFFF;       /**< 上次血氧值 */
+static uint8_t  last_finger = 0xFF;       /**< 上次手指检测状态 */
 
 /*============================================================================*/
 /*                              显示更新（主入口）                              */
@@ -34,6 +40,7 @@ void Display_Update(void)
     {
         OLED_Clear();
         last_page = current_page;
+        page0_static_drawn = 0;  /* 重置页面0静态内容标志 */
 #ifdef ENABLE_DEBUG_PAGE
         extern uint32_t display_loop_time_max_ms;
         display_loop_time_max_ms = 0;  /* 切换页面时重置最大时间 */
@@ -44,7 +51,12 @@ void Display_Update(void)
     switch (current_page)
     {
         case PAGE_HEARTRATE:
-            Display_Page0_HeartRate();
+            /* 心率页面：10Hz刷新 */
+            if (display_refresh_flag)
+            {
+                display_refresh_flag = 0;
+                Display_Page0_HeartRate();
+            }
             break;
             
         case PAGE_ECG:
@@ -73,37 +85,23 @@ void Display_Update(void)
 /*============================================================================*/
 
 /**
- * @brief  页面0: 心率血氧显示
+ * @brief  页面0: 绘制静态内容（仅在页面切换时调用一次）
  */
-void Display_Page0_HeartRate(void)
+static void Display_Page0_DrawStatic(void)
 {
-    MAX30102_Data_t *data = MAX30102_GetData();
-    
     /* 标题 */
     OLED_ShowString(0, 0, "Heart Rate & SpO2", OLED_6X8);
     
     /* 分隔线 */
     OLED_DrawLine(0, 10, 127, 10);
     
-    /* 心率显示 */
+    /* 心率标签 */
     OLED_ShowString(10, 16, "HR:", OLED_8X16);
-    OLED_ShowNum(50, 16, data->heart_rate, 3, OLED_8X16);
     OLED_ShowString(80, 16, "bpm", OLED_8X16);
     
-    /* 血氧显示 */
+    /* 血氧标签 */
     OLED_ShowString(10, 36, "SpO2:", OLED_8X16);
-    OLED_ShowNum(60, 36, data->spo2, 3, OLED_8X16);
     OLED_ShowString(100, 36, "%", OLED_8X16);
-    
-    /* 手指检测状态 */
-    if (data->finger_detected)
-    {
-        OLED_ShowString(100, 0, "OK", OLED_6X8);
-    }
-    else
-    {
-        OLED_ShowString(100, 0, "--", OLED_6X8);
-    }
     
     /* 页码指示 */
     OLED_ShowString(0, 56, "<K1", OLED_6X8);
@@ -114,7 +112,67 @@ void Display_Page0_HeartRate(void)
 #endif
     OLED_ShowString(110, 56, "K3>", OLED_6X8);
     
-    OLED_Update();
+    page0_static_drawn = 1;
+}
+
+/**
+ * @brief  页面0: 心率血氧显示（局部刷新优化）
+ * @note   仅更新变化的数值区域，使用 OLED_UpdateArea 局部刷新
+ * 
+ * @details 刷新区域定义:
+ *          - 心率数值: X=50, Y=16, 宽24(3字*8), 高16 (8x16字体)
+ *          - 血氧数值: X=60, Y=36, 宽24(3字*8), 高16 (8x16字体)
+ *          - 手指状态: X=100, Y=0, 宽12(2字*6), 高8 (6x8字体)
+ */
+void Display_Page0_HeartRate(void)
+{
+    MAX30102_Data_t *data = MAX30102_GetData();
+    
+    /* 首次进入页面，绘制静态内容并全屏刷新 */
+    if (!page0_static_drawn)
+    {
+        Display_Page0_DrawStatic();
+        last_hr = 0xFFFF;      /* 强制刷新数值 */
+        last_spo2 = 0xFFFF;
+        last_finger = 0xFF;
+        
+        /* 绘制初始数值 */
+        OLED_ShowNum(50, 16, data->heart_rate, 3, OLED_8X16);
+        OLED_ShowNum(60, 36, data->spo2, 3, OLED_8X16);
+        OLED_ShowString(100, 0, data->finger_detected ? "OK" : "--", OLED_6X8);
+        
+        /* 首次全屏刷新 */
+        OLED_Update();
+        
+        last_hr = data->heart_rate;
+        last_spo2 = data->spo2;
+        last_finger = data->finger_detected;
+        return;
+    }
+    
+    /* 心率值变化时局部刷新 */
+    if (data->heart_rate != last_hr)
+    {
+        last_hr = data->heart_rate;
+        OLED_ShowNum(50, 16, data->heart_rate, 3, OLED_8X16);
+        OLED_UpdateArea(50, 16, 24, 16);  /* 只刷新心率数字区域 */
+    }
+    
+    /* 血氧值变化时局部刷新 */
+    if (data->spo2 != last_spo2)
+    {
+        last_spo2 = data->spo2;
+        OLED_ShowNum(60, 36, data->spo2, 3, OLED_8X16);
+        OLED_UpdateArea(60, 36, 24, 16);  /* 只刷新血氧数字区域 */
+    }
+    
+    /* 手指检测状态变化时局部刷新 */
+    if (data->finger_detected != last_finger)
+    {
+        last_finger = data->finger_detected;
+        OLED_ShowString(100, 0, data->finger_detected ? "OK" : "--", OLED_6X8);
+        OLED_UpdateArea(100, 0, 12, 8);   /* 只刷新状态区域 */
+    }
 }
 
 /*============================================================================*/

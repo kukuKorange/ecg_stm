@@ -78,6 +78,8 @@ void Timer3_Init(void)
 
 /*============================ 外部变量 ============================*/
 
+extern volatile uint8_t display_refresh_flag;  /**< 10Hz显示刷新标志 */
+
 #ifdef ENABLE_DEBUG_PAGE
 extern volatile uint8_t debug_refresh_flag;  /**< 调试页面刷新标志 */
 #endif
@@ -115,9 +117,14 @@ void TIM3_IRQHandler(void)
             ECG_SampleAndDraw();
         }
         
+        /* 5Hz任务: 心率页面显示刷新 */
+        if (tim3_counter % 20000 == 0){
+            display_refresh_flag = 1;
+        }
+        
 #ifdef ENABLE_DEBUG_PAGE
-        /* 10Hz任务: 调试页面刷新（仅在调试页面执行） */
-        if ((tim3_counter % 10000 == 0) && (current_page == PAGE_DEBUG)){
+        /* 10Hz任务: 调试页面刷新 */
+        if (tim3_counter % 10000 == 0){
             debug_refresh_flag = 1;
         }
 #endif
