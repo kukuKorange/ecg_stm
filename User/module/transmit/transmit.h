@@ -30,7 +30,7 @@
  * @brief  数据传输间隔 (秒)
  * @note   每隔此时间发送一次生命体征数据
  */
-#define TRANSMIT_INTERVAL_SEC       10
+#define TRANSMIT_INTERVAL_SEC       5   /* 每5秒发送一次，心率和血氧交替 */
 
 /**
  * @brief  报警检测间隔 (秒)

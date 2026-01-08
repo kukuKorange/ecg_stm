@@ -157,7 +157,19 @@ uint8_t esp8266_check_cmd(char *str)
 }
 
 /**
-  * @brief  向云端发送数据（通用）
+  * @brief  向指定主题发送数据
+  * @param  topic: MQTT主题
+  * @param  Data: 数据值（整数）
+  * @note   发送格式：AT+MQTTPUB=0,"topic","data",1,0
+  */
+void ESP8266_SendToTopic(const char *topic, int Data)
+{
+    USART2_RX_STA = 0;
+    u2_printf("AT+MQTTPUB=0,\"%s\",\"%d\",1,0\r\n", topic, Data);
+}
+
+/**
+  * @brief  向云端发送数据（通用，兼容旧代码）
   * @param  property: 属性名称
   * @param  Data: 属性值（整数）
   * @note   发送格式：AT+MQTTPUB=0,"topic","{\"property\":data}",1,0

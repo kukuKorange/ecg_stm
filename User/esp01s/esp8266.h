@@ -31,13 +31,16 @@
 
 /*============================ MQTT通用配置 ============================*/
 
-/* MQTT主题 (与Python服务端保持一致) */
-#define MQTT_TOPIC_VITAL    "ecg/vitalsign"   /**< 生命体征数据主题 */
-#define MQTT_TOPIC_ALARM    "ecg/alarm"       /**< 报警信息主题 */
-#define MQTT_TOPIC_SUB      "ecg/cmd"         /**< 订阅指令主题 */
+/* MQTT主题 */
+#define MQTT_TOPIC_HEARTRATE    "health/heartrate"    /**< 心率数据主题 */
+#define MQTT_TOPIC_SPO2         "health/spo2"         /**< 血氧数据主题 */
+#define MQTT_TOPIC_TEMPERATURE  "health/temperature"  /**< 体温数据主题 */
+#define MQTT_TOPIC_ECG          "health/ecg"          /**< 心电数据主题 */
+#define MQTT_TOPIC_ALARM        "health/alarm"        /**< 报警信息主题 */
 
 /* 兼容旧代码 */
-#define MQTT_TOPIC_POST     MQTT_TOPIC_VITAL
+#define MQTT_TOPIC_VITAL    MQTT_TOPIC_HEARTRATE
+#define MQTT_TOPIC_POST     MQTT_TOPIC_HEARTRATE
 #define POST                MQTT_TOPIC_POST
 #define MQTT_PROPERTY_NAME  "heartRate"
 #define POST_NAME           MQTT_PROPERTY_NAME
@@ -108,7 +111,14 @@ uint8_t esp8266_send_cmd(char *cmd, char *ack, uint16_t waittime);
 uint8_t esp8266_check_cmd(char *str);
 
 /**
-  * @brief  向服务器发送数据（通用）
+  * @brief  向指定主题发送数据
+  * @param  topic: MQTT主题 (如 MQTT_TOPIC_HEARTRATE)
+  * @param  Data: 数据值
+  */
+void ESP8266_SendToTopic(const char *topic, int Data);
+
+/**
+  * @brief  向服务器发送数据（通用，兼容旧代码）
   * @param  property: 属性名称
   * @param  Data: 属性值
   */

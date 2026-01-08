@@ -71,19 +71,30 @@ void Transmit_Process(void)
 
 /**
  * @brief  发送生命体征数据
- * @note   每次只发送心率，减少UART负担
+ * @note   每5秒交替发送心率和血氧
+ *         - 第1次调用: 发送心率
+ *         - 第2次调用: 发送血氧
+ *         - 循环...
  */
 void Transmit_SendVitalSign(void)
 {
+    static uint8_t send_toggle = 0;  /* 0:心率, 1:血氧 */
     MAX30102_Data_t *data = MAX30102_GetData();
     
     /* 只有检测到手指且有有效数据时才发送 */
-    if (data->finger_detected && data->heart_rate > 0)
+    if (send_toggle == 0)
     {
-        /* 只发送心率，血氧可根据需要开启 */
-        ESP8266_Send("heartRate", data->heart_rate);
-        // ESP8266_Send("spo2", data->spo2);  /* 暂时关闭减少负担 */
+        /* 发送心率到 health/heartrate */
+        ESP8266_SendToTopic(MQTT_TOPIC_HEARTRATE, data->heart_rate);
     }
+    else
+    {
+        /* 发送血氧到 health/spo2 */
+        ESP8266_SendToTopic(MQTT_TOPIC_SPO2, data->spo2);
+    }
+    
+    /* 切换下次发送的内容 */
+    send_toggle = !send_toggle;
 }
 
 /**
