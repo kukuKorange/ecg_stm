@@ -115,7 +115,9 @@ void Key_Process(void)
             {
                 /* 开始ECG批量上传（使用当前秒数作为时间戳） */
                 extern uint16_t test;  /* 秒计数器 */
-                extern void Transmit_StartECGUpload(uint32_t timestamp);
+                extern uint8_t Transmit_StartECGUpload(uint32_t timestamp);
+                
+                /* 返回0表示还没有完整的600点数据 */
                 Transmit_StartECGUpload(test);
             }
             break;

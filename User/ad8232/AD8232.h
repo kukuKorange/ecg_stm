@@ -17,8 +17,6 @@ extern uint16_t ecg_index;          /**< ECG数据索引 */
 extern uint16_t test;               /**< 测试计数器 */
 
 /* ECG上传相关 */
-extern uint16_t ecg_upload_buffer[];     /**< ECG上传缓存 */
-extern uint16_t ecg_upload_write_idx;    /**< 写入索引 */
 extern uint8_t  ecg_upload_active;       /**< 上传进行中标志 */
 
 /*============================ 函数声明 ============================*/
@@ -72,8 +70,28 @@ void ChartOptimize(uint16_t *R, uint16_t *Chart);
 /**
  * @brief  开始ECG数据上传
  * @param  timestamp: 数据起始时间戳
+ * @retval 1: 开始上传, 0: 无完整数据可上传
  */
-void ECG_StartUpload(uint32_t timestamp);
+uint8_t ECG_StartUpload(uint32_t timestamp);
+
+/**
+ * @brief  检查是否有完整数据可上传
+ * @retval 1: 有完整600点数据, 0: 无
+ */
+uint8_t ECG_IsDataReady(void);
+
+/**
+ * @brief  读取上传缓冲区指定索引的数据
+ * @param  index: 数据索引 (0-599)
+ * @retval 该索引处的ECG值
+ */
+uint16_t ECG_GetUploadData(uint16_t index);
+
+/**
+ * @brief  获取上传缓冲区指针
+ * @retval 上传缓冲区起始地址
+ */
+uint16_t* ECG_GetUploadBuffer(void);
 
 /**
  * @brief  停止ECG数据上传

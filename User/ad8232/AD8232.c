@@ -27,21 +27,34 @@ uint16_t map_upload[130] = {0}; /**< 上传数据缓冲区（旧版兼容） */
 uint16_t ecg_index = 1;         /**< ECG数据索引 */
 uint16_t test = 0;              /**< 测试计数器（秒） */
 
-/*============================ ECG上传缓存 ============================*/
+/*============================ ECG上传缓存（双缓冲） ============================*/
 
 #define ECG_UPLOAD_BUFFER_SIZE  600   /**< 上传缓存大小（3秒 @ 200Hz） */
 #define ECG_UPLOAD_BATCH_SIZE   1     /**< 每批上传点数 */
 
-uint16_t ecg_upload_buffer[ECG_UPLOAD_BUFFER_SIZE];  /**< ECG原始数据上传缓存 */
-uint16_t ecg_upload_write_idx = 0;    /**< 写入索引 */
-uint16_t ecg_upload_read_idx = 0;     /**< 上传读取索引 */
-uint8_t  ecg_upload_active = 0;       /**< 上传进行中标志 */
-uint32_t ecg_upload_timestamp = 0;    /**< 上传数据起始时间戳 */
+/**
+ * 双缓冲机制:
+ * - fill_buffer:   正在采集的缓冲区（不断写入新数据）
+ * - upload_buffer: 完整的600点数据，用于上传
+ * - 采集满600点时自动交换，确保upload_buffer始终是完整数据
+ */
+static uint16_t ecg_buffer_a[ECG_UPLOAD_BUFFER_SIZE];  /**< 缓冲区A */
+static uint16_t ecg_buffer_b[ECG_UPLOAD_BUFFER_SIZE];  /**< 缓冲区B */
+
+static uint16_t *ecg_fill_buffer = ecg_buffer_a;       /**< 当前采集缓冲区 */
+static uint16_t *ecg_upload_buffer = ecg_buffer_b;     /**< 当前上传缓冲区 */
+
+static uint16_t ecg_fill_idx = 0;         /**< 采集缓冲区写入索引 */
+static uint8_t  ecg_buffer_ready = 0;     /**< 上传缓冲区数据就绪标志 */
+
+uint16_t ecg_upload_read_idx = 0;         /**< 上传读取索引 */
+uint8_t  ecg_upload_active = 0;           /**< 上传进行中标志 */
+uint32_t ecg_upload_timestamp = 0;        /**< 上传数据起始时间戳 */
 
 /*============================ 私有变量 ============================*/
 
 static uint16_t draw_x = 0;           /**< 绘图X坐标 */
-static uint16_t last_filtered = 2048; /**< 上一次滤波值（用于上传数据滤波）*/
+static float last_filtered = 2048; /**< 上一次滤波值（用于上传数据滤波）*/
 
 /*============================ 函数实现 ============================*/
 
@@ -105,7 +118,7 @@ uint8_t GetConnect(void)
 void ECG_SampleAndDraw(void)
 {
     uint16_t adc_raw;
-    uint16_t filtered;
+    float filtered;
     
     /* 注意: 调用前需在Timer2.c中判断 current_page == PAGE_ECG */
     
@@ -113,17 +126,27 @@ void ECG_SampleAndDraw(void)
     adc_raw = AD_GetValue();
     
     /* 2. 低通滤波: y = y_last + 0.25 * (y_new - y_last) */
-    filtered = last_filtered + (int16_t)(adc_raw - last_filtered) * 0.25f;
+    filtered = last_filtered + ((float)adc_raw - last_filtered) * 0.25f;
     last_filtered = filtered;
     
-    /* 3. 保存滤波后数据到上传缓存 */
-    if (!ecg_upload_active)  /* 上传过程中不覆盖数据 */
+    /* 3. 保存滤波后数据到采集缓冲区（双缓冲机制） */
+    ecg_fill_buffer[ecg_fill_idx] = (uint16_t)filtered;
+    ecg_fill_idx++;
+    
+    /* 采集满600点，交换缓冲区 */
+    if (ecg_fill_idx >= ECG_UPLOAD_BUFFER_SIZE)
     {
-        ecg_upload_buffer[ecg_upload_write_idx] = filtered;
-        ecg_upload_write_idx++;
-        if (ecg_upload_write_idx >= ECG_UPLOAD_BUFFER_SIZE)
+        uint16_t *temp;
+        
+        ecg_fill_idx = 0;
+        
+        /* 只有在上传完成后才交换缓冲区 */
+        if (!ecg_upload_active)
         {
-            ecg_upload_write_idx = 0;
+            temp = ecg_fill_buffer;
+            ecg_fill_buffer = ecg_upload_buffer;
+            ecg_upload_buffer = temp;
+            ecg_buffer_ready = 1;  /* 标记有完整数据可上传 */
         }
     }
     
@@ -254,13 +277,23 @@ void ChartOptimize(uint16_t *R, uint16_t *Chart)
 /**
   * @brief  开始ECG数据上传
   * @param  timestamp: 数据起始时间戳
-  * @note   调用后，ECG_UploadProcess() 会分批上传数据
+  * @note   调用后，ECG_UploadProcess() 会分批上传完整的600点数据
+  * @retval 1: 开始上传, 0: 无数据可上传
   */
-void ECG_StartUpload(uint32_t timestamp)
+uint8_t ECG_StartUpload(uint32_t timestamp)
 {
+    /* 检查是否有完整的数据可上传 */
+    if (!ecg_buffer_ready)
+    {
+        return 0;  /* 还没有完整的600点数据 */
+    }
+    
     ecg_upload_timestamp = timestamp;
     ecg_upload_read_idx = 0;
     ecg_upload_active = 1;
+    ecg_buffer_ready = 0;  /* 清除就绪标志，等待下一次采集完成 */
+    
+    return 1;
 }
 
 /**
@@ -274,16 +307,52 @@ void ECG_StopUpload(void)
 
 /**
   * @brief  获取待上传的数据量
-  * @retval 缓存中的数据点数
+  * @retval 缓存中的数据点数（始终为600或0）
   */
 uint16_t ECG_GetUploadDataCount(void)
 {
-    return ecg_upload_write_idx;
+    if (ecg_upload_active || ecg_buffer_ready)
+    {
+        return ECG_UPLOAD_BUFFER_SIZE;
+    }
+    return 0;
+}
+
+/**
+  * @brief  检查是否有完整数据可上传
+  * @retval 1: 有完整600点数据, 0: 无
+  */
+uint8_t ECG_IsDataReady(void)
+{
+    return ecg_buffer_ready;
+}
+
+/**
+  * @brief  读取上传缓冲区指定索引的数据
+  * @param  index: 数据索引 (0-599)
+  * @retval 该索引处的ECG值
+  */
+uint16_t ECG_GetUploadData(uint16_t index)
+{
+    if (index < ECG_UPLOAD_BUFFER_SIZE)
+    {
+        return ecg_upload_buffer[index];
+    }
+    return 0;
+}
+
+/**
+  * @brief  获取上传缓冲区指针
+  * @retval 上传缓冲区起始地址
+  */
+uint16_t* ECG_GetUploadBuffer(void)
+{
+    return ecg_upload_buffer;
 }
 
 /**
   * @brief  获取一批ECG数据用于上传
-  * @param  batch_data: 输出缓冲区（至少20个元素）
+  * @param  batch_data: 输出缓冲区
   * @param  batch_size: 请求的批次大小
   * @retval 实际获取的数据点数（0表示上传完成）
   */
@@ -298,8 +367,8 @@ uint16_t ECG_GetUploadBatch(uint16_t *batch_data, uint16_t batch_size)
         return 0;
     }
     
-    /* 计算剩余数据量 */
-    available = ecg_upload_write_idx - ecg_upload_read_idx;
+    /* 计算剩余数据量（固定600点） */
+    available = ECG_UPLOAD_BUFFER_SIZE - ecg_upload_read_idx;
     if (available == 0)
     {
         /* 上传完成 */
@@ -317,7 +386,7 @@ uint16_t ECG_GetUploadBatch(uint16_t *batch_data, uint16_t batch_size)
         batch_size = ECG_UPLOAD_BATCH_SIZE;
     }
     
-    /* 复制数据 */
+    /* 从上传缓冲区复制数据 */
     for (i = 0; i < batch_size; i++)
     {
         batch_data[i] = ecg_upload_buffer[ecg_upload_read_idx + i];
@@ -335,11 +404,11 @@ uint16_t ECG_GetUploadBatch(uint16_t *batch_data, uint16_t batch_size)
   */
 uint8_t ECG_GetUploadProgress(void)
 {
-    if (ecg_upload_write_idx == 0)
+    if (!ecg_upload_active)
     {
         return 100;
     }
-    return (uint8_t)((ecg_upload_read_idx * 100) / ecg_upload_write_idx);
+    return (uint8_t)((ecg_upload_read_idx * 100) / ECG_UPLOAD_BUFFER_SIZE);
 }
 
 /**

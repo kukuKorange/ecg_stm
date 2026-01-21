@@ -92,14 +92,9 @@ extern volatile uint8_t ecg_upload_flag;
 /**
  * @brief  开始ECG上传（由按键触发）
  * @param  timestamp: 当前时间戳
+ * @retval 1: 开始上传, 0: 无完整数据可上传（需等待采集满600点）
  */
-void Transmit_StartECGUpload(uint32_t timestamp);
-
-/**
- * @brief  ECG上传处理（在主循环中调用）
- * @note   每100ms发送一批数据（20个采样点）
- */
-void Transmit_ECGUploadProcess(void);
+uint8_t Transmit_StartECGUpload(uint32_t timestamp);
 
 /**
  * @brief  获取ECG上传进度
