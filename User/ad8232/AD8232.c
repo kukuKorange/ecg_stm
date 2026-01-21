@@ -153,8 +153,16 @@ void ECG_SampleAndDraw(void)
     /* 4. 绘制波形 */
     if (ecg_index < 120)
     {
-        /* 数据缩放（适配OLED Y轴范围10-55） */
-        ecg_data[ecg_index] = 90 - filtered / 45;
+        int16_t y_pos;
+        
+        /* 数据缩放（保持原比例） */
+        y_pos = 90 - (int16_t)(filtered / 45);
+        
+        /* 边界限制：确保在坐标轴内 (Y: 11-53) */
+        if (y_pos < 11) y_pos = 11;
+        if (y_pos > 53) y_pos = 53;
+        
+        ecg_data[ecg_index] = (uint16_t)y_pos;
         ecg_data[0] = ecg_data[1];
         
         /* 绘制波形线段 */
