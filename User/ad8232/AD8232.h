@@ -33,6 +33,12 @@ void AD8232Init(void);
 uint8_t GetConnect(void);
 
 /**
+ * @brief  获取ECG计算的心率
+ * @retval 心率值 (bpm)，0表示尚未检测到有效心率
+ */
+uint8_t ECG_GetHeartRate(void);
+
+/**
  * @brief  获取心率值
  * @param  array: 数据数组
  * @param  length: 数组长度

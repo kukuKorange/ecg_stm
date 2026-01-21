@@ -54,7 +54,28 @@ uint32_t ecg_upload_timestamp = 0;        /**< 上传数据起始时间戳 */
 /*============================ 私有变量 ============================*/
 
 static uint16_t draw_x = 0;           /**< 绘图X坐标 */
-static float last_filtered = 2048; /**< 上一次滤波值（用于上传数据滤波）*/
+static float last_filtered = 2048;    /**< 上一次滤波值（用于上传数据滤波）*/
+
+/*============================ 心率检测变量 ============================*/
+
+#define ECG_SAMPLE_RATE     200       /**< 采样率 (Hz) */
+#define ECG_HR_MIN          30        /**< 最小有效心率 */
+#define ECG_HR_MAX          220       /**< 最大有效心率 */
+#define ECG_PEAK_THRESHOLD  2300      /**< R波峰值检测阈值（根据实际信号调整） */
+#define ECG_REFRACTORY_MS   200       /**< 不应期 (ms)，防止重复检测 */
+#define ECG_HR_FILTER_SIZE  4         /**< 心率滑动平均滤波窗口大小 */
+
+static float ecg_prev_value = 2048;   /**< 上一个采样值（用于峰值检测） */
+static float ecg_prev_prev_value = 2048; /**< 上上个采样值 */
+static uint32_t ecg_sample_count = 0; /**< 采样计数器 */
+static uint32_t ecg_last_peak_sample = 0; /**< 上一次R波的采样点 */
+static uint8_t ecg_heart_rate = 0;    /**< 滤波后的心率 (bpm) */
+static uint8_t ecg_peak_detected = 0; /**< 峰值检测标志（用于调试） */
+
+/* 心率滑动平均滤波 */
+static uint8_t ecg_hr_buffer[ECG_HR_FILTER_SIZE] = {0};  /**< 心率历史缓冲区 */
+static uint8_t ecg_hr_buffer_idx = 0;    /**< 缓冲区写入索引 */
+static uint8_t ecg_hr_buffer_count = 0;  /**< 缓冲区有效数据个数 */
 
 /*============================ 函数实现 ============================*/
 
@@ -106,6 +127,15 @@ uint8_t GetConnect(void)
 }
 
 /**
+  * @brief  获取ECG计算的心率
+  * @retval 心率值 (bpm)，0表示尚未检测到有效心率
+  */
+uint8_t ECG_GetHeartRate(void)
+{
+    return ecg_heart_rate;
+}
+
+/**
   * @brief  ECG数据采集与绘制
   * @note   此函数应在定时器中断中调用，采样率200Hz
   *         
@@ -126,14 +156,72 @@ void ECG_SampleAndDraw(void)
     adc_raw = AD_GetValue();
     
     /* 2. 低通滤波: y = y_last + 0.25 * (y_new - y_last) */
-    filtered = last_filtered + ((float)adc_raw - last_filtered) * 0.25f;
+    filtered = last_filtered + ((float)adc_raw - last_filtered) * 0.4f;
     last_filtered = filtered;
     
     /* 3. 保存滤波后数据到采集缓冲区（双缓冲机制） */
     ecg_fill_buffer[ecg_fill_idx] = (uint16_t)filtered;
     ecg_fill_idx++;
+    ecg_sample_count++;
     
-    /* 采集满600点，交换缓冲区 */
+    /* 4. R波峰值检测与心率计算 */
+    {
+        uint32_t refractory_samples = (ECG_REFRACTORY_MS * ECG_SAMPLE_RATE) / 1000;
+        
+        /* 峰值检测：当前点比前后两点都大，且超过阈值 */
+        /* 使用上上个点作为"当前检测点"，因为需要看后一个点 */
+        if ((ecg_sample_count > refractory_samples + ecg_last_peak_sample) &&  /* 不应期后 */
+            (ecg_prev_value > ecg_prev_prev_value) &&    /* 前一点 < 当前点 */
+            (ecg_prev_value > filtered) &&               /* 当前点 > 后一点（正在下降） */
+            (ecg_prev_value > ECG_PEAK_THRESHOLD))       /* 超过阈值 */
+        {
+            /* 检测到 R 波峰值 */
+            ecg_peak_detected = 1;
+            
+            if (ecg_last_peak_sample > 0)
+            {
+                /* 计算 RR 间期（采样点数） */
+                uint32_t rr_samples = ecg_sample_count - ecg_last_peak_sample - 1;
+                
+                /* 换算心率: HR = 60 * 采样率 / RR间期 */
+                uint16_t hr = (60 * ECG_SAMPLE_RATE) / rr_samples;
+                
+                /* 有效性检查后进行滑动平均滤波 */
+                if (hr >= ECG_HR_MIN && hr <= ECG_HR_MAX)
+                {
+                    uint16_t sum = 0;
+                    uint8_t i;
+                    
+                    /* 存入滤波缓冲区 */
+                    ecg_hr_buffer[ecg_hr_buffer_idx] = (uint8_t)hr;
+                    ecg_hr_buffer_idx = (ecg_hr_buffer_idx + 1) % ECG_HR_FILTER_SIZE;
+                    if (ecg_hr_buffer_count < ECG_HR_FILTER_SIZE)
+                    {
+                        ecg_hr_buffer_count++;
+                    }
+                    
+                    /* 计算平均值 */
+                    for (i = 0; i < ecg_hr_buffer_count; i++)
+                    {
+                        sum += ecg_hr_buffer[i];
+                    }
+                    ecg_heart_rate = (uint8_t)(sum / ecg_hr_buffer_count);
+                }
+            }
+            
+            ecg_last_peak_sample = ecg_sample_count - 1;
+        }
+        else
+        {
+            ecg_peak_detected = 0;
+        }
+        
+        /* 更新历史值 */
+        ecg_prev_prev_value = ecg_prev_value;
+        ecg_prev_value = filtered;
+    }
+    
+    /* 5. 采集满600点，交换缓冲区 */
     if (ecg_fill_idx >= ECG_UPLOAD_BUFFER_SIZE)
     {
         uint16_t *temp;
@@ -150,7 +238,7 @@ void ECG_SampleAndDraw(void)
         }
     }
     
-    /* 4. 绘制波形 */
+    /* 6. 绘制波形 */
     if (ecg_index < 120)
     {
         int16_t y_pos;

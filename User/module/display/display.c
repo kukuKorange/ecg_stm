@@ -184,6 +184,8 @@ void Display_Page0_HeartRate(void)
  */
 void Display_Page1_ECG(void)
 {
+    uint8_t ecg_hr;
+    
     /* 标题 */
     OLED_ShowString(0, 0, "ECG Monitor", OLED_6X8);
     
@@ -193,8 +195,13 @@ void Display_Page1_ECG(void)
     OLED_DrawTriangle(1, 8, 0, 10, 2, 10, OLED_UNFILLED);    /* Y轴箭头 */
     OLED_DrawTriangle(120, 55, 120, 53, 123, 54, OLED_UNFILLED);  /* X轴箭头 */
     
-    /* 显示心电数据（由Timer3中断更新） */
-    OLED_ShowNum(100, 0, test, 3, OLED_6X8);
+    /* 显示测试时间 */
+    OLED_ShowNum(70, 0, test, 3, OLED_6X8);
+    OLED_ShowString(88, 0, "s", OLED_6X8);
+    
+    /* 显示ECG计算的心率 */
+    ecg_hr = ECG_GetHeartRate();
+    OLED_ShowNum(100, 0, ecg_hr, 3, OLED_6X8);
     
     /* 页码指示 */
     OLED_ShowString(0, 56, "<K1", OLED_6X8);
