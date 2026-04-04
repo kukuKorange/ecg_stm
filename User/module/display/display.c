@@ -22,8 +22,10 @@ static uint8_t last_page = 0xFF;          /**< 上一次的页面，用于检测
 /* 页面0局部刷新相关 */
 static uint8_t  page0_static_drawn = 0;   /**< 页面0静态内容是否已绘制 */
 static uint16_t last_hr = 0xFFFF;         /**< 上次心率值 */
+#ifdef USE_MAX30102
 static uint16_t last_spo2 = 0xFFFF;       /**< 上次血氧值 */
 static uint8_t  last_finger = 0xFF;       /**< 上次手指检测状态 */
+#endif
 
 /*============================================================================*/
 /*                              显示更新（主入口）                              */
@@ -89,9 +91,14 @@ void Display_Update(void)
  */
 static void Display_Page0_DrawStatic(void)
 {
-    /* 标题 */
+#ifdef USE_MAX30102
+    /* 标题: 心率+血氧 */
     OLED_ShowString(0, 0, "Heart Rate & SpO2", OLED_6X8);
-    
+#else
+    /* 标题: 仅ECG心率 */
+    OLED_ShowString(0, 0, "Heart Rate (ECG)", OLED_6X8);
+#endif
+
     /* 分隔线 */
     OLED_DrawLine(0, 10, 127, 10);
     
@@ -99,10 +106,12 @@ static void Display_Page0_DrawStatic(void)
     OLED_ShowString(10, 16, "HR:", OLED_8X16);
     OLED_ShowString(80, 16, "bpm", OLED_8X16);
     
-    /* 血氧标签 */
+#ifdef USE_MAX30102
+    /* 血氧标签（仅MAX30102模式） */
     OLED_ShowString(10, 36, "SpO2:", OLED_8X16);
     OLED_ShowString(100, 36, "%", OLED_8X16);
-    
+#endif
+
     /* 页码指示 */
     OLED_ShowString(0, 56, "<K1", OLED_6X8);
 #ifdef ENABLE_DEBUG_PAGE
@@ -126,44 +135,55 @@ static void Display_Page0_DrawStatic(void)
  */
 void Display_Page0_HeartRate(void)
 {
+#ifdef USE_MAX30102
     MAX30102_Data_t *data = MAX30102_GetData();
-    
+    uint16_t current_hr = data->heart_rate;
+#else
+    uint16_t current_hr = (uint16_t)ECG_GetHeartRate();
+#endif
+
     /* 首次进入页面，绘制静态内容并全屏刷新 */
     if (!page0_static_drawn)
     {
         Display_Page0_DrawStatic();
         last_hr = 0xFFFF;      /* 强制刷新数值 */
+#ifdef USE_MAX30102
         last_spo2 = 0xFFFF;
         last_finger = 0xFF;
+#endif
         
-        /* 绘制初始数值 */
-        OLED_ShowNum(50, 16, data->heart_rate, 3, OLED_8X16);
+        OLED_ShowNum(50, 16, current_hr, 3, OLED_8X16);
+#ifdef USE_MAX30102
         OLED_ShowNum(60, 36, data->spo2, 3, OLED_8X16);
         OLED_ShowString(100, 0, data->finger_detected ? "OK" : "--", OLED_6X8);
+#endif
         
         /* 首次全屏刷新 */
         OLED_Update();
         
-        last_hr = data->heart_rate;
+        last_hr = current_hr;
+#ifdef USE_MAX30102
         last_spo2 = data->spo2;
         last_finger = data->finger_detected;
+#endif
         return;
     }
     
     /* 心率值变化时局部刷新 */
-    if (data->heart_rate != last_hr)
+    if (current_hr != last_hr)
     {
-        last_hr = data->heart_rate;
-        OLED_ShowNum(50, 16, data->heart_rate, 3, OLED_8X16);
-        OLED_UpdateArea(50, 16, 24, 16);  /* 只刷新心率数字区域 */
+        last_hr = current_hr;
+        OLED_ShowNum(50, 16, current_hr, 3, OLED_8X16);
+        OLED_UpdateArea(50, 16, 24, 16);
     }
     
+#ifdef USE_MAX30102
     /* 血氧值变化时局部刷新 */
     if (data->spo2 != last_spo2)
     {
         last_spo2 = data->spo2;
         OLED_ShowNum(60, 36, data->spo2, 3, OLED_8X16);
-        OLED_UpdateArea(60, 36, 24, 16);  /* 只刷新血氧数字区域 */
+        OLED_UpdateArea(60, 36, 24, 16);
     }
     
     /* 手指检测状态变化时局部刷新 */
@@ -171,8 +191,9 @@ void Display_Page0_HeartRate(void)
     {
         last_finger = data->finger_detected;
         OLED_ShowString(100, 0, data->finger_detected ? "OK" : "--", OLED_6X8);
-        OLED_UpdateArea(100, 0, 12, 8);   /* 只刷新状态区域 */
+        OLED_UpdateArea(100, 0, 12, 8);
     }
+#endif
 }
 
 /*============================================================================*/
@@ -237,41 +258,40 @@ void Display_Page1_ECG(void)
 void Display_Page2_Debug(void)
 {
     uint16_t adc_raw;
+#ifdef USE_MAX30102
     MAX30102_Data_t *data = MAX30102_GetData();
+#endif
     
-    /* 读取当前ADC值 */
     adc_raw = AD_GetValue();
     
-    /* 标题 */
     OLED_ShowString(0, 0, "[DEBUG] 10Hz", OLED_6X8);
-    
-    /* 分隔线 */
     OLED_DrawLine(0, 10, 127, 10);
     
-    /* 循环时间（当前） */
     OLED_ShowString(0, 14, "Loop:", OLED_6X8);
     OLED_ShowNum(36, 14, display_loop_time_ms, 5, OLED_6X8);
     OLED_ShowString(72, 14, "10us", OLED_6X8);
     
-    /* 循环时间（最大） */
     OLED_ShowString(0, 24, "Max:", OLED_6X8);
     OLED_ShowNum(30, 24, display_loop_time_max_ms, 5, OLED_6X8);
     OLED_ShowString(66, 24, "10us", OLED_6X8);
     
-    /* ADC和心率 */
     OLED_ShowString(0, 34, "ADC:", OLED_6X8);
     OLED_ShowNum(30, 34, adc_raw, 4, OLED_6X8);
     OLED_ShowString(80, 34, "HR:", OLED_6X8);
+#ifdef USE_MAX30102
     OLED_ShowNum(104, 34, data->heart_rate, 3, OLED_6X8);
+#else
+    OLED_ShowNum(104, 34, ECG_GetHeartRate(), 3, OLED_6X8);
+#endif
     
-    /* 运行时间和血氧 */
     OLED_ShowString(0, 44, "Time:", OLED_6X8);
     OLED_ShowNum(36, 44, test, 4, OLED_6X8);
     OLED_ShowString(62, 44, "s", OLED_6X8);
+#ifdef USE_MAX30102
     OLED_ShowString(80, 44, "SpO2:", OLED_6X8);
     OLED_ShowNum(110, 44, data->spo2, 3, OLED_6X8);
+#endif
     
-    /* 页码指示 */
     OLED_ShowString(0, 56, "<K1", OLED_6X8);
     OLED_ShowString(45, 56, "3/3", OLED_6X8);
     OLED_ShowString(110, 56, "K3>", OLED_6X8);

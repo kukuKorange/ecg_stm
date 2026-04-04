@@ -24,8 +24,10 @@
 #include "key.h"
 
 /* 功能模块 */
+#ifdef USE_MAX30102
 #include "max30102.h"
 #include "max30102_fir.h"
+#endif
 #include "module/display/display.h"
 #include "module/transmit/transmit.h"
 
@@ -64,11 +66,11 @@ int main(void){
     /* 初始化LED */
     LED_GPIO_Config();
     
-    /* 初始化心率血氧模块 */
+    /* 初始化MAX30102心率血氧模块（可通过kconfig.h中USE_MAX30102关闭） */
+#ifdef USE_MAX30102
     max30102_init();
-    
-    /* FIR滤波计算初始化 */
     max30102_fir_init();
+#endif
     
     OLED_Init();
     
@@ -94,11 +96,13 @@ int main(void){
         Key_Process();
         
         /* ==================== 心率血氧数据采集（50Hz，由定时器触发） ==================== */
+#ifdef USE_MAX30102
         if (max30102_process_flag)
         {
             max30102_process_flag = 0;
             MAX30102_Process();
         }
+#endif
         
         /* ==================== 页面显示更新 ==================== */
         Display_Update();

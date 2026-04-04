@@ -6,7 +6,11 @@
  */
 
 #include "./led/bsp_led.h"
+#ifdef USE_MAX30102
 #include "max30102.h"
+#else
+#include "ad8232.h"
+#endif
 
 /**
  * @brief  初始化控制LED的IO
@@ -41,10 +45,11 @@ void LED_GPIO_Config(void)
 #ifdef ENABLE_LED_INDICATOR
 /**
  * @brief  LED状态更新
- * @note   根据心率血氧数据更新LED状态
+ * @note   根据心率数据更新LED状态
  */
 void LED_StatusUpdate(void)
 {
+#ifdef USE_MAX30102
     MAX30102_Data_t *data = MAX30102_GetData();
     
     /* LED1: 手指检测指示 */
@@ -66,6 +71,19 @@ void LED_StatusUpdate(void)
     {
         LED2_OFF;
     }
+#else
+    /* 无MAX30102：LED1关闭（无手指检测），LED2基于ECG心率报警 */
+    LED1_OFF;
+    
+    if (ECG_GetHeartRate() >= HR_ALARM_THRESHOLD)
+    {
+        LED2_ON;
+    }
+    else
+    {
+        LED2_OFF;
+    }
+#endif
 }
 #endif
 

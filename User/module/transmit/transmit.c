@@ -11,7 +11,9 @@
 
 #include "transmit.h"
 #include "esp8266.h"
+#ifdef USE_MAX30102
 #include "max30102.h"
+#endif
 #include "ad8232.h"
 
 /*============================================================================*/
@@ -93,23 +95,23 @@ void Transmit_Process(void)
  */
 void Transmit_SendVitalSign(void)
 {
+#ifdef USE_MAX30102
     static uint8_t send_toggle = 0;  /* 0:心率, 1:血氧 */
     MAX30102_Data_t *data = MAX30102_GetData();
     
-    /* 只有检测到手指且有有效数据时才发送 */
     if (send_toggle == 0)
     {
-        /* 发送心率到 health/heartrate */
         ESP8266_SendToTopic(MQTT_TOPIC_HEARTRATE, data->heart_rate);
     }
     else
     {
-        /* 发送血氧到 health/spo2 */
         ESP8266_SendToTopic(MQTT_TOPIC_SPO2, data->spo2);
     }
-    
-    /* 切换下次发送的内容 */
     send_toggle = !send_toggle;
+#else
+    /* 无MAX30102，仅发送ECG计算的心率 */
+    ESP8266_SendToTopic(MQTT_TOPIC_HEARTRATE, (uint16_t)ECG_GetHeartRate());
+#endif
 }
 
 /**
@@ -117,31 +119,42 @@ void Transmit_SendVitalSign(void)
  */
 void Transmit_CheckAlarm(void)
 {
+#ifdef USE_MAX30102
     MAX30102_Data_t *data = MAX30102_GetData();
     
-    /* 未检测到手指时不报警 */
     if (!data->finger_detected)
     {
         return;
     }
     
-    /* 血氧过低报警 */
     if (data->spo2 > 0 && data->spo2 < SPO2_ALARM_THRESHOLD)
     {
         ESP8266_Send("alarm", ALARM_TYPE_SPO2_LOW);
     }
     
-    /* 心率过高报警 */
     if (data->heart_rate > HR_HIGH_THRESHOLD)
     {
         ESP8266_Send("alarm", ALARM_TYPE_HR_HIGH);
     }
     
-    /* 心率过低报警 */
     if (data->heart_rate > 0 && data->heart_rate < HR_LOW_THRESHOLD)
     {
         ESP8266_Send("alarm", ALARM_TYPE_HR_LOW);
     }
+#else
+    /* 无MAX30102，仅基于ECG心率报警（无血氧报警） */
+    uint8_t ecg_hr = ECG_GetHeartRate();
+    
+    if (ecg_hr > HR_HIGH_THRESHOLD)
+    {
+        ESP8266_Send("alarm", ALARM_TYPE_HR_HIGH);
+    }
+    
+    if (ecg_hr > 0 && ecg_hr < HR_LOW_THRESHOLD)
+    {
+        ESP8266_Send("alarm", ALARM_TYPE_HR_LOW);
+    }
+#endif
 }
 
 /**

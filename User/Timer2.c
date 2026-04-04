@@ -22,8 +22,10 @@
 #include "ad8232.h"
 #include "esp8266.h"
 #include "key.h"
+#ifdef USE_MAX30102
 #include "max30102.h"
 #include "max30102_fir.h"
+#endif
 #include "module/transmit/transmit.h"
 
 /*============================ 私有变量 ============================*/
@@ -108,10 +110,12 @@ void TIM3_IRQHandler(void)
             Transmit_TimerCallback();  /* 每秒调用一次传输模块 */
         }
 		
-		/* 50Hz任务: 心率血氧采集（非ECG页面执行） */
+		/* 50Hz任务: 心率血氧采集（非ECG页面执行，仅USE_MAX30102启用时有效） */
+#ifdef USE_MAX30102
 		if ((tim3_counter % 2000 == 0) && (current_page != PAGE_ECG)){
 			max30102_process_flag = 1;
 		}
+#endif
         
         /* 200Hz任务: ECG采样与绘制（仅在心电图页面执行） */
         if ((tim3_counter % 500 == 0) && (current_page == PAGE_ECG)){
