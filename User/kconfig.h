@@ -60,6 +60,24 @@
 // #define USE_MAX30102
 
 /**
+ * @brief  启用ECG信号模拟（软件仿真，替代ADC硬件采样）
+ * @note   启用后:
+ *         - 用软件生成的标准PQRST波形替代 AD8232/ADC 真实采样
+ *         - 无需连接电极，可直接在OLED查看心电图和心率
+ *         - 生成的R波峰值(ADC≈3548)高于检测阈值(2300)，心率算法正常工作
+ *         - 与 ECG_SIM_BPM 配合设定模拟心率
+ * 
+ *         关闭: 注释此行（恢复真实AD8232采样）
+ */
+#define USE_ECG_SIM
+
+/**
+ * @brief  模拟心率 (bpm)
+ * @note   仅在 USE_ECG_SIM 启用时有效，有效范围 30-200
+ */
+#define ECG_SIM_BPM         72
+
+/**
  * @brief  启用心率检测功能
  */
 #define ENABLE_HEARTRATE

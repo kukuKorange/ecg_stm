@@ -9,6 +9,7 @@
 #define __AD8232_H
 
 #include "stdint.h"
+#include "kconfig.h"
 
 /*============================ 外部变量 ============================*/
 extern uint16_t ecg_data[500];      /**< ECG数据缓冲区 */

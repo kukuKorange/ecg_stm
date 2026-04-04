@@ -28,6 +28,9 @@
 #include "max30102.h"
 #include "max30102_fir.h"
 #endif
+#ifdef USE_ECG_SIM
+#include "ecg_sim/ecg_sim.h"
+#endif
 #include "module/display/display.h"
 #include "module/transmit/transmit.h"
 
@@ -82,11 +85,18 @@ int main(void){
     AD_Init();
     AD8232Init();
     Timer3_Init();
+
+    /* ECG信号模拟器初始化（USE_ECG_SIM启用时替代硬件ADC采样） */
+#ifdef USE_ECG_SIM
+    ECG_Sim_Init(ECG_SIM_BPM);
+#endif
     
     /* 按键初始化 */
     Key_Init();
+
     
     while(1){
+			  LED1_ON;
 #ifdef ENABLE_DEBUG_PAGE
         /* ==================== 记录循环开始时间（使用TIM3的ms计数器） ==================== */
         loop_start_ms = tim3_ms_counter;

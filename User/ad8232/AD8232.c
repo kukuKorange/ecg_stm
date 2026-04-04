@@ -19,6 +19,9 @@
 #include "ad8232.h"
 #include "OLED.h"
 #include "AD.h"
+#ifdef USE_ECG_SIM
+#include "ecg_sim.h"
+#endif
 
 /*============================ 全局变量 ============================*/
 
@@ -152,8 +155,12 @@ void ECG_SampleAndDraw(void)
     
     /* 注意: 调用前需在Timer2.c中判断 current_page == PAGE_ECG */
     
-    /* 1. 读取ADC原始值 */
+    /* 1. 获取ECG采样值（模拟或真实硬件） */
+#ifdef USE_ECG_SIM
+    adc_raw = ECG_Sim_GetSample();
+#else
     adc_raw = AD_GetValue();
+#endif
     
     /* 2. 低通滤波: y = y_last + 0.25 * (y_new - y_last) */
     filtered = last_filtered + ((float)adc_raw - last_filtered) * 0.4f;
