@@ -30,6 +30,21 @@ __align(8) uint8_t USART2_TX_BUF[USART2_MAX_SEND_LEN];
 uint8_t USART2_RX_BUF[USART2_MAX_RECV_LEN];
 
 /**
+  * @brief  透传模式标志
+  * @note   为 1 时，ISR 不做 CR/LF 帧检测，直接将所有字节顺序累积进
+  *         USART2_RX_BUF，由 usart2_raw_len 独立计数，bit15不置位。
+  *         用于 AT+RST 启动日志的完整捕获。
+  */
+volatile uint8_t  usart2_raw_mode = 0;
+
+/**
+  * @brief  透传模式专属计数器
+  * @note   仅在透传模式下由 ISR 递增，不受正常帧模式溢出保护影响。
+  *         使用前由调用方归零，读取时无需屏蔽高位。
+  */
+volatile uint16_t usart2_raw_len  = 0;
+
+/**
   * @brief  接收状态标志
   * @note   帧模式接收，以 0x0D 0x0A (\\r\\n) 作为帧结束标志
   *         
@@ -103,9 +118,23 @@ void USART2_IRQHandler(void)
 
     if (USART_GetITStatus(USART2, USART_IT_RXNE) != RESET)
     {
-        Res = USART_ReceiveData(USART2);
+        Res = USART_ReceiveData(USART2);  /* 必须读取，清除 RXNE */
 
-        if ((USART2_RX_STA & 0x8000) == 0)  /* 接收未完成 */
+        if (usart2_raw_mode)
+        {
+            /*
+             * 透传模式：关闭帧检测，将所有字节顺序累积进缓冲区。
+             * 使用独立的 usart2_raw_len 计数，与 USART2_RX_STA 完全隔离，
+             * 避免正常帧模式的溢出保护（USART2_RX_STA=0）误清计数。
+             */
+            if (usart2_raw_len < USART2_MAX_RECV_LEN - 1)
+            {
+                USART2_RX_BUF[usart2_raw_len] = Res;
+                usart2_raw_len++;
+            }
+            /* 缓冲区满时静默丢弃（boot日志约400字节，600字节缓冲足够）*/
+        }
+        else if ((USART2_RX_STA & 0x8000) == 0)  /* 帧模式：接收未完成 */
         {
             if (USART2_RX_STA & 0x4000)     /* 已收到 0x0D */
             {
@@ -137,6 +166,7 @@ void USART2_IRQHandler(void)
                 }
             }
         }
+        /* 帧模式 0x8000 已置位时：Res 已被读走（清除 RXNE），正常丢弃 */
     }
 }
 #endif /* USART2_RX_EN */

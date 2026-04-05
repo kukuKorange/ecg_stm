@@ -15,14 +15,16 @@
 
 /*============================ 配置宏 ============================*/
 
-#define USART2_MAX_RECV_LEN     600     /**< 最大接收缓冲区大小 (字节) */
+#define USART2_MAX_RECV_LEN     2000     /**< 最大接收缓冲区大小 (字节) */
 #define USART2_MAX_SEND_LEN     600     /**< 最大发送缓冲区大小 (字节) */
 #define USART2_RX_EN            1       /**< 接收使能: 0=禁用, 1=启用 */
 
 /*============================ 外部变量 ============================*/
 
-extern uint8_t  USART2_RX_BUF[USART2_MAX_RECV_LEN];  /**< 接收缓冲区 */
-extern uint16_t USART2_RX_STA;                        /**< 接收状态标志 */
+extern uint8_t            USART2_RX_BUF[USART2_MAX_RECV_LEN];  /**< 接收缓冲区 */
+extern uint16_t           USART2_RX_STA;                        /**< 接收状态标志 */
+extern volatile uint8_t   usart2_raw_mode; /**< 透传模式: 1=关闭帧检测，直接累积所有字节 */
+extern volatile uint16_t  usart2_raw_len;  /**< 透传模式专属计数器，与帧模式完全隔离 */
 
 /*============================ 函数声明 ============================*/
 

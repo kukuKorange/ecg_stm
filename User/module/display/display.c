@@ -12,6 +12,7 @@
 #include "ad8232.h"
 #include "AD.h"
 #include "Key.h"
+#include "esp8266.h"
 
 /*============================================================================*/
 /*                              私有变量                                       */
@@ -246,13 +247,13 @@ void Display_Page1_ECG(void)
  * 
  * @details 显示内容（10Hz刷新）:
  *          ┌────────────────────────┐
- *          │ [DEBUG] 10Hz           │
- *          │────────────────────────│
- *          │ Loop: 1234 10us        │
- *          │ Max:  5678 10us        │
- *          │ ADC:  2048   HR: 75    │
- *          │ Time: 123 s  SpO2: 98  │
- *          │ [<] Page 3/3     [>]   │
+ *          │ [DBG] T:XXXs  HR: XXX  │  y=0
+ *          │────────────────────────│  y=10
+ *          │ Loop: XXXXX 10us       │  y=14
+ *          │ Max:  XXXXX 10us       │  y=24
+ *          │ ADC:  XXXX   HR: XXX   │  y=34
+ *          │ MAC:XX:XX:XX:XX:XX:XX  │  y=44
+ *          │ [<] Page 3/3     [>]   │  y=56
  *          └────────────────────────┘
  */
 void Display_Page2_Debug(void)
@@ -261,41 +262,49 @@ void Display_Page2_Debug(void)
 #ifdef USE_MAX30102
     MAX30102_Data_t *data = MAX30102_GetData();
 #endif
-    
+
     adc_raw = AD_GetValue();
-    
-    OLED_ShowString(0, 0, "[DEBUG] 10Hz", OLED_6X8);
+
+    /* 标题行: [DBG] T:XXXs  HR:XXX */
+    OLED_ShowString(0, 0, "[DBG]T:", OLED_6X8);
+    OLED_ShowNum(42, 0, test, 4, OLED_6X8);
+    OLED_ShowString(66, 0, "s", OLED_6X8);
+    OLED_ShowString(78, 0, "HR:", OLED_6X8);
+#ifdef USE_MAX30102
+    OLED_ShowNum(102, 0, data->heart_rate, 3, OLED_6X8);
+#else
+    OLED_ShowNum(102, 0, ECG_GetHeartRate(), 3, OLED_6X8);
+#endif
+
     OLED_DrawLine(0, 10, 127, 10);
-    
+
+    /* 循环时间 */
     OLED_ShowString(0, 14, "Loop:", OLED_6X8);
     OLED_ShowNum(36, 14, display_loop_time_ms, 5, OLED_6X8);
     OLED_ShowString(72, 14, "10us", OLED_6X8);
-    
+
+    /* 最大循环时间 */
     OLED_ShowString(0, 24, "Max:", OLED_6X8);
     OLED_ShowNum(30, 24, display_loop_time_max_ms, 5, OLED_6X8);
     OLED_ShowString(66, 24, "10us", OLED_6X8);
-    
+
+    /* ADC原始值 + 心率（SpO2已移至标题） */
     OLED_ShowString(0, 34, "ADC:", OLED_6X8);
     OLED_ShowNum(30, 34, adc_raw, 4, OLED_6X8);
-    OLED_ShowString(80, 34, "HR:", OLED_6X8);
 #ifdef USE_MAX30102
-    OLED_ShowNum(104, 34, data->heart_rate, 3, OLED_6X8);
-#else
-    OLED_ShowNum(104, 34, ECG_GetHeartRate(), 3, OLED_6X8);
+    OLED_ShowString(66, 34, "SpO2:", OLED_6X8);
+    OLED_ShowNum(102, 34, data->spo2, 3, OLED_6X8);
 #endif
-    
-    OLED_ShowString(0, 44, "Time:", OLED_6X8);
-    OLED_ShowNum(36, 44, test, 4, OLED_6X8);
-    OLED_ShowString(62, 44, "s", OLED_6X8);
-#ifdef USE_MAX30102
-    OLED_ShowString(80, 44, "SpO2:", OLED_6X8);
-    OLED_ShowNum(110, 44, data->spo2, 3, OLED_6X8);
-#endif
-    
+
+    /* MAC地址行: "MAC:XX:XX:XX:XX:XX:XX" (4+17=21字符, 126px, 刚好适配128px) */
+    OLED_ShowString(0, 44, "MAC:", OLED_6X8);
+    OLED_ShowString(24, 44, esp8266_mac, OLED_6X8);
+
+    /* 页码指示 */
     OLED_ShowString(0, 56, "<K1", OLED_6X8);
     OLED_ShowString(45, 56, "3/3", OLED_6X8);
     OLED_ShowString(110, 56, "K3>", OLED_6X8);
-    
+
     OLED_Update();
 }
 #endif

@@ -86,6 +86,7 @@
 /*============================ 外部变量 ============================*/
 
 extern unsigned char Property_Data[];  /**< 云端属性数据缓冲区 */
+extern char esp8266_mac[18];           /**< STA模式MAC地址, 格式 "xx:xx:xx:xx:xx:xx" */
 
 /*============================ 函数声明 ============================*/
 
@@ -93,6 +94,12 @@ extern unsigned char Property_Data[];  /**< 云端属性数据缓冲区 */
   * @brief  ESP8266模块初始化
   */
 void ESP8266_Init(void);
+
+/**
+  * @brief  读取STA模式MAC地址 (AT+CIPSTAMAC?)
+  * @note   结果写入 esp8266_mac[]，初始化期间自动调用
+  */
+void ESP8266_GetMAC(void);
 
 /**
   * @brief  向ESP8266发送AT指令
