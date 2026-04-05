@@ -13,6 +13,9 @@
 #include "AD.h"
 #include "Key.h"
 #include "esp8266.h"
+#ifdef USE_ECG_SIM
+#include "ecg_sim.h"
+#endif
 
 /*============================================================================*/
 /*                              私有变量                                       */
@@ -22,7 +25,8 @@ static uint8_t last_page = 0xFF;          /**< 上一次的页面，用于检测
 
 /* 页面0局部刷新相关 */
 static uint8_t  page0_static_drawn = 0;   /**< 页面0静态内容是否已绘制 */
-static uint16_t last_hr = 0xFFFF;         /**< 上次心率值 */
+static uint16_t last_hr     = 0xFFFF;     /**< 上次检测心率值 */
+static uint8_t  last_sim_bpm = 0xFF;      /**< 上次模拟器BPM（用于局部刷新）*/
 #ifdef USE_MAX30102
 static uint16_t last_spo2 = 0xFFFF;       /**< 上次血氧值 */
 static uint8_t  last_finger = 0xFF;       /**< 上次手指检测状态 */
@@ -111,6 +115,10 @@ static void Display_Page0_DrawStatic(void)
     /* 血氧标签（仅MAX30102模式） */
     OLED_ShowString(10, 36, "SpO2:", OLED_8X16);
     OLED_ShowString(100, 36, "%", OLED_8X16);
+#elif defined(USE_ECG_SIM)
+    /* 模拟器BPM标签（仅USE_ECG_SIM模式，占用SpO2行空位） */
+    OLED_ShowString(10, 36, "Sim:", OLED_8X16);
+    OLED_ShowString(80, 36, "bpm", OLED_8X16);
 #endif
 
     /* 页码指示 */
@@ -147,37 +155,38 @@ void Display_Page0_HeartRate(void)
     if (!page0_static_drawn)
     {
         Display_Page0_DrawStatic();
-        last_hr = 0xFFFF;      /* 强制刷新数值 */
+        last_hr      = 0xFFFF;   /* 强制刷新数值 */
+        last_sim_bpm = 0xFF;
 #ifdef USE_MAX30102
-        last_spo2 = 0xFFFF;
+        last_spo2   = 0xFFFF;
         last_finger = 0xFF;
 #endif
-        
         OLED_ShowNum(50, 16, current_hr, 3, OLED_8X16);
 #ifdef USE_MAX30102
         OLED_ShowNum(60, 36, data->spo2, 3, OLED_8X16);
         OLED_ShowString(100, 0, data->finger_detected ? "OK" : "--", OLED_6X8);
+#elif defined(USE_ECG_SIM)
+        OLED_ShowNum(58, 36, ECG_Sim_GetBPM(), 3, OLED_8X16);
 #endif
-        
-        /* 首次全屏刷新 */
         OLED_Update();
-        
         last_hr = current_hr;
 #ifdef USE_MAX30102
-        last_spo2 = data->spo2;
+        last_spo2   = data->spo2;
         last_finger = data->finger_detected;
+#elif defined(USE_ECG_SIM)
+        last_sim_bpm = ECG_Sim_GetBPM();
 #endif
         return;
     }
-    
-    /* 心率值变化时局部刷新 */
+
+    /* 检测心率变化时局部刷新 */
     if (current_hr != last_hr)
     {
         last_hr = current_hr;
         OLED_ShowNum(50, 16, current_hr, 3, OLED_8X16);
         OLED_UpdateArea(50, 16, 24, 16);
     }
-    
+
 #ifdef USE_MAX30102
     /* 血氧值变化时局部刷新 */
     if (data->spo2 != last_spo2)
@@ -186,13 +195,23 @@ void Display_Page0_HeartRate(void)
         OLED_ShowNum(60, 36, data->spo2, 3, OLED_8X16);
         OLED_UpdateArea(60, 36, 24, 16);
     }
-    
     /* 手指检测状态变化时局部刷新 */
     if (data->finger_detected != last_finger)
     {
         last_finger = data->finger_detected;
         OLED_ShowString(100, 0, data->finger_detected ? "OK" : "--", OLED_6X8);
         OLED_UpdateArea(100, 0, 12, 8);
+    }
+#elif defined(USE_ECG_SIM)
+    /* 模拟器BPM变化时局部刷新 */
+    {
+        uint8_t cur_sim = ECG_Sim_GetBPM();
+        if (cur_sim != last_sim_bpm)
+        {
+            last_sim_bpm = cur_sim;
+            OLED_ShowNum(58, 36, cur_sim, 3, OLED_8X16);
+            OLED_UpdateArea(58, 36, 24, 16);
+        }
     }
 #endif
 }
@@ -221,9 +240,13 @@ void Display_Page1_ECG(void)
     OLED_ShowNum(70, 0, test, 3, OLED_6X8);
     OLED_ShowString(88, 0, "s", OLED_6X8);
     
-    /* 显示ECG计算的心率 */
+    /* 显示ECG检测心率 */
+#ifdef USE_ECG_SIM
+    OLED_ShowNum(100, 0, ECG_Sim_GetBPM(), 3, OLED_6X8);
+#else
     ecg_hr = ECG_GetHeartRate();
     OLED_ShowNum(100, 0, ecg_hr, 3, OLED_6X8);
+#endif
     
     /* 页码指示 */
     OLED_ShowString(0, 56, "<K1", OLED_6X8);
@@ -288,12 +311,15 @@ void Display_Page2_Debug(void)
     OLED_ShowNum(30, 24, display_loop_time_max_ms, 5, OLED_6X8);
     OLED_ShowString(66, 24, "10us", OLED_6X8);
 
-    /* ADC原始值 + 心率（SpO2已移至标题） */
+    /* ADC原始值 + 模拟BPM / SpO2 */
     OLED_ShowString(0, 34, "ADC:", OLED_6X8);
     OLED_ShowNum(30, 34, adc_raw, 4, OLED_6X8);
 #ifdef USE_MAX30102
     OLED_ShowString(66, 34, "SpO2:", OLED_6X8);
     OLED_ShowNum(102, 34, data->spo2, 3, OLED_6X8);
+#elif defined(USE_ECG_SIM)
+    OLED_ShowString(60, 34, "Sim:", OLED_6X8);
+    OLED_ShowNum(90, 34, ECG_Sim_GetBPM(), 3, OLED_6X8);
 #endif
 
     /* MAC地址行: "MAC:XX:XX:XX:XX:XX:XX" (4+17=21字符, 126px, 刚好适配128px) */

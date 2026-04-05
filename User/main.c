@@ -96,7 +96,6 @@ int main(void){
 
     
     while(1){
-			  LED1_ON;
 #ifdef ENABLE_DEBUG_PAGE
         /* ==================== 记录循环开始时间（使用TIM3的ms计数器） ==================== */
         loop_start_ms = tim3_ms_counter;

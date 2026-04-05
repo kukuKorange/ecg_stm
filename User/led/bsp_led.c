@@ -6,6 +6,10 @@
  */
 
 #include "./led/bsp_led.h"
+#ifdef USE_ECG_SIM
+#include "ecg_sim/ecg_sim.h"
+#endif
+#include "kconfig.h"
 #ifdef USE_MAX30102
 #include "max30102.h"
 #else
@@ -74,14 +78,18 @@ void LED_StatusUpdate(void)
 #else
     /* 无MAX30102：LED1关闭（无手指检测），LED2基于ECG心率报警 */
     LED1_OFF;
-    
-    if (ECG_GetHeartRate() >= HR_ALARM_THRESHOLD)
+#ifdef USE_ECG_SIM
+    uint8_t ecg_hr = ECG_Sim_GetBPM();
+#else
+    uint8_t ecg_hr = ECG_GetHeartRate();
+#endif
+    if (ecg_hr >= HR_ALARM_THRESHOLD_HIGH || ecg_hr <= HR_ALARM_THRESHOLD_LOW)
     {
-        LED2_ON;
+        LED1_ON;
     }
     else
     {
-        LED2_OFF;
+        LED1_OFF;
     }
 #endif
 }

@@ -55,13 +55,69 @@
 /*                              私有变量                                       */
 /*============================================================================*/
 
-static uint8_t  sim_bpm = ECG_SIM_BPM;    /**< 当前模拟心率              */
-static uint16_t sim_cycle_len = 0;         /**< 单个心动周期的采样点数    */
-static uint16_t sim_phase = 0;             /**< 当前采样在周期内的索引    */
+static uint8_t  sim_bpm       = ECG_SIM_BPM; /**< 当前模拟心率（实时漫游）    */
+static uint16_t sim_cycle_len = 0;            /**< 单个心动周期的采样点数      */
+static uint16_t sim_phase     = 0;            /**< 当前采样在周期内的索引      */
+
+/* ---- BPM 慢速漫游控制 ---- */
+/* 原理：每隔若干个心动周期，将 BPM ±1，在 [60,80] 内来回游走。
+ *       间隔时长由 8-bit Galois LFSR 随机化（7~18 个心动周期），
+ *       使心率曲线更自然，不像机械式周期摆动。
+ *       所有更新只在 sim_phase 归零（周期边界）处发生，
+ *       保证波形连续、不产生相位跳变。                              */
+#define SIM_BPM_MIN   60
+#define SIM_BPM_MAX   90
+
+static int8_t  sim_wander_dir  =  1;   /**< 漫游方向: +1=升, -1=降    */
+static uint8_t sim_wander_hold =  0;   /**< 当前方向已持续的心动周期数 */
+static uint8_t sim_wander_next = 10;   /**< 下次步进前等待的周期数     */
+static uint8_t sim_lfsr        = 0xA5u;/**< 8-bit Galois LFSR 状态     */
 
 /*============================================================================*/
 /*                              私有函数                                       */
 /*============================================================================*/
+
+/**
+ * @brief  在每个心动周期结束时推进 BPM 漫游
+ *
+ * @note   只能在 sim_phase 归零后（周期边界处）调用，
+ *         保证 cycle_len 的变更对当前采样无影响。
+ *
+ *         LFSR 参数: 多项式 x^8+x^6+x^5+x^4+1, 抽头掩码 0xB8
+ *         该多项式产生最大周期 255，混合后等待时间范围 7~18 周期
+ *         （对应 6~18 秒 @ 70bpm），肉眼难以察觉规律性。
+ */
+static void prv_wander_step(void)
+{
+    sim_wander_hold++;
+    if (sim_wander_hold < sim_wander_next)
+        return;  /* 尚未到步进时刻 */
+
+    sim_wander_hold = 0;
+
+    /* BPM ±1，到边界时反向 */
+    if (sim_wander_dir > 0)
+    {
+        if (sim_bpm < SIM_BPM_MAX)
+            sim_bpm++;
+        else
+            sim_wander_dir = -1;
+    }
+    else
+    {
+        if (sim_bpm > SIM_BPM_MIN)
+            sim_bpm--;
+        else
+            sim_wander_dir = 1;
+    }
+
+    /* 重新计算周期长度（仅在边界调用，不造成相位跳变）*/
+    sim_cycle_len = (uint16_t)((uint32_t)ECG_SIM_SAMPLE_RATE * 60u / sim_bpm);
+
+    /* 推进 LFSR，随机化下一个等待时长（7~18 个心动周期）*/
+    sim_lfsr = (uint8_t)((sim_lfsr >> 1) ^ ((uint8_t)(-(sim_lfsr & 1u)) & 0xB8u));
+    sim_wander_next = 7 + (sim_lfsr % 12u);  /* [7, 18] */
+}
 
 /**
  * @brief  计算指定千分位相位处的ECG电压偏移
@@ -145,13 +201,19 @@ static int16_t ecg_sim_offset(uint16_t pm)
  */
 void ECG_Sim_Init(uint8_t bpm)
 {
-    if (bpm < 30)  bpm = 30;
-    if (bpm > 200) bpm = 200;
+    /* 将初始 BPM 钳位到漫游范围内，保持与漫游逻辑一致 */
+    if (bpm < SIM_BPM_MIN) bpm = SIM_BPM_MIN;
+    if (bpm > SIM_BPM_MAX) bpm = SIM_BPM_MAX;
 
-    sim_bpm = bpm;
-    /* 每个心动周期的采样点数 = 采样率(Hz) * 60(s/min) / 心率(bpm) */
+    sim_bpm       = bpm;
     sim_cycle_len = (uint16_t)((uint32_t)ECG_SIM_SAMPLE_RATE * 60u / bpm);
-    sim_phase = 0;
+    sim_phase     = 0;
+
+    /* 重置漫游状态 */
+    sim_wander_dir  = 1;
+    sim_wander_hold = 0;
+    sim_wander_next = 10;
+    sim_lfsr        = 0xA5u;
 }
 
 /**
@@ -172,11 +234,12 @@ uint16_t ECG_Sim_GetSample(void)
     if (adc < 0)    adc = 0;
     if (adc > 4095) adc = 4095;
 
-    /* 推进相位，到周期末尾时归零 */
+    /* 推进相位，到周期末尾时归零并执行漫游步进 */
     sim_phase++;
     if (sim_phase >= sim_cycle_len)
     {
         sim_phase = 0;
+        prv_wander_step();  /* 仅在周期边界更新BPM，保证波形连续 */
     }
 
     return (uint16_t)adc;

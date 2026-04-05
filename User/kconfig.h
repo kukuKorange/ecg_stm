@@ -118,23 +118,14 @@
  * @brief  心率报警阈值 (bpm)
  * @note   心率超过此值时LED2亮起并上报报警
  */
-#define HR_ALARM_THRESHOLD      70
+#define HR_ALARM_THRESHOLD_LOW      40
 
+#define HR_ALARM_THRESHOLD_HIGH      120
 /**
  * @brief  血氧报警阈值 (%)
  * @note   血氧低于此值时上报报警
  */
 #define SPO2_ALARM_THRESHOLD    95
-
-/**
- * @brief  心率过低阈值 (bpm)
- */
-#define HR_LOW_THRESHOLD        50
-
-/**
- * @brief  心率过高阈值 (bpm)
- */
-#define HR_HIGH_THRESHOLD       120
 
 /*============================================================================*/
 /*                              MQTT报警类型                                    */

@@ -14,6 +14,9 @@
 #ifdef USE_MAX30102
 #include "max30102.h"
 #endif
+#ifdef USE_ECG_SIM
+#include "ecg_sim/ecg_sim.h"
+#endif
 #include "ad8232.h"
 
 /*============================================================================*/
@@ -97,11 +100,10 @@ void Transmit_SendVitalSign(void)
 {
 #ifdef USE_MAX30102
     static uint8_t send_toggle = 0;  /* 0:心率, 1:血氧 */
-    MAX30102_Data_t *data = MAX30102_GetData();
     
     if (send_toggle == 0)
-    {
-        ESP8266_SendToTopic(MQTT_TOPIC_HEARTRATE, data->heart_rate);
+    {   
+        ESP8266_SendToTopic(MQTT_TOPIC_HEARTRATE, ecg_hr);
     }
     else
     {
@@ -110,7 +112,12 @@ void Transmit_SendVitalSign(void)
     send_toggle = !send_toggle;
 #else
     /* 无MAX30102，仅发送ECG计算的心率 */
-    ESP8266_SendToTopic(MQTT_TOPIC_HEARTRATE, (uint16_t)ECG_GetHeartRate());
+#ifdef USE_ECG_SIM
+    uint8_t ecg_hr = ECG_Sim_GetBPM();
+#else
+    uint8_t ecg_hr = ECG_GetHeartRate();
+#endif
+    ESP8266_SendToTopic(MQTT_TOPIC_HEARTRATE, (uint16_t)ecg_hr);
 #endif
 }
 
@@ -143,14 +150,18 @@ void Transmit_CheckAlarm(void)
     }
 #else
     /* 无MAX30102，仅基于ECG心率报警（无血氧报警） */
+#ifdef USE_ECG_SIM
+    uint8_t ecg_hr = ECG_Sim_GetBPM();
+#else
     uint8_t ecg_hr = ECG_GetHeartRate();
+#endif
     
-    if (ecg_hr > HR_HIGH_THRESHOLD)
+    if (ecg_hr > HR_ALARM_THRESHOLD_HIGH)
     {
         ESP8266_Send("alarm", ALARM_TYPE_HR_HIGH);
     }
     
-    if (ecg_hr > 0 && ecg_hr < HR_LOW_THRESHOLD)
+    if (ecg_hr > 0 && ecg_hr < HR_ALARM_THRESHOLD_LOW)
     {
         ESP8266_Send("alarm", ALARM_TYPE_HR_LOW);
     }
