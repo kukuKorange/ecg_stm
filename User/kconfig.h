@@ -57,7 +57,7 @@
  * 
  *         关闭: 注释此行
  */
-// #define USE_MAX30102
+#define USE_MAX30102
 
 /**
  * @brief  启用ECG信号模拟（软件仿真，替代ADC硬件采样）

@@ -100,7 +100,12 @@ void Transmit_SendVitalSign(void)
 {
 #ifdef USE_MAX30102
     static uint8_t send_toggle = 0;  /* 0:心率, 1:血氧 */
-    
+    MAX30102_Data_t *data = MAX30102_GetData();
+#ifdef USE_ECG_SIM
+    uint8_t ecg_hr = ECG_Sim_GetBPM();
+#else
+    uint8_t ecg_hr = ECG_GetHeartRate();
+#endif
     if (send_toggle == 0)
     {   
         ESP8266_SendToTopic(MQTT_TOPIC_HEARTRATE, ecg_hr);
@@ -139,12 +144,12 @@ void Transmit_CheckAlarm(void)
         ESP8266_Send("alarm", ALARM_TYPE_SPO2_LOW);
     }
     
-    if (data->heart_rate > HR_HIGH_THRESHOLD)
+    if (data->heart_rate > HR_ALARM_THRESHOLD_HIGH)
     {
         ESP8266_Send("alarm", ALARM_TYPE_HR_HIGH);
     }
     
-    if (data->heart_rate > 0 && data->heart_rate < HR_LOW_THRESHOLD)
+    if (data->heart_rate > 0 && data->heart_rate < HR_ALARM_THRESHOLD_LOW)
     {
         ESP8266_Send("alarm", ALARM_TYPE_HR_LOW);
     }

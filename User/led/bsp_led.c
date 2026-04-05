@@ -67,7 +67,7 @@ void LED_StatusUpdate(void)
     }
     
     /* LED2: 心率报警 */
-    if (data->heart_rate >= HR_ALARM_THRESHOLD)
+    if (data->heart_rate >= HR_ALARM_THRESHOLD_HIGH || data->heart_rate <= HR_ALARM_THRESHOLD_LOW)
     {
         LED2_ON;
     }
