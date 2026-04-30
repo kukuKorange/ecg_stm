@@ -259,7 +259,7 @@ void ESP8266_Init(void)
     }
     
     /* 设置WiFi工作模式为Station模式 */
-    esp8266_send_cmd("AT+C WMODE=1", "OK", 50);
+    esp8266_send_cmd("AT+CWMODE=1", "OK", 50);
     
     /* 软复位模块，同步解析 boot 日志中的 wifi_mac 字段 */
     prv_RST_ParseMAC();
