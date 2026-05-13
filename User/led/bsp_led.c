@@ -67,29 +67,44 @@ void LED_StatusUpdate(void)
     }
     
     /* LED2: 心率报警 */
-    if (data->heart_rate >= HR_ALARM_THRESHOLD_HIGH || data->heart_rate <= HR_ALARM_THRESHOLD_LOW)
+    if (data->heart_rate == 0)
     {
-        LED2_ON;
+        LED2_OFF;
     }
     else
     {
-        LED2_OFF;
+        if (data->heart_rate >= HR_ALARM_THRESHOLD_HIGH || data->heart_rate <= HR_ALARM_THRESHOLD_LOW)
+        {
+            LED2_ON;
+        }
+        else
+        {
+            LED2_OFF;
+        }
     }
 #else
     /* 无MAX30102：LED1关闭（无手指检测），LED2基于ECG心率报警 */
     LED1_OFF;
+    
 #ifdef USE_ECG_SIM
     uint8_t ecg_hr = ECG_Sim_GetBPM();
 #else
     uint8_t ecg_hr = ECG_GetHeartRate();
 #endif
-    if (ecg_hr >= HR_ALARM_THRESHOLD_HIGH || ecg_hr <= HR_ALARM_THRESHOLD_LOW)
+    if (ecg_hr == 0)
     {
-        LED1_ON;
+        LED2_OFF;
     }
     else
     {
-        LED1_OFF;
+        if (ecg_hr >= HR_ALARM_THRESHOLD_HIGH || ecg_hr <= HR_ALARM_THRESHOLD_LOW)
+        {
+            LED2_ON;
+        }
+        else
+        {
+            LED2_OFF;
+        }
     }
 #endif
 }

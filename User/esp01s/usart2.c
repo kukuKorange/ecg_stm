@@ -24,7 +24,7 @@
 /*============================ 全局变量 ============================*/
 
 /** @brief 发送缓冲区 (8字节对齐) */
-__align(8) uint8_t USART2_TX_BUF[USART2_MAX_SEND_LEN];
+__attribute__((aligned(8))) uint8_t USART2_TX_BUF[USART2_MAX_SEND_LEN];
 
 /** @brief 接收缓冲区 */
 uint8_t USART2_RX_BUF[USART2_MAX_RECV_LEN];
