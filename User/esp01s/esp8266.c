@@ -247,23 +247,23 @@ void ESP8266_Init(void)
 {
     uint8_t retry;
     
-    /* 等待模块启动 */
-    delay_ms(2000);
+    // /* 等待模块启动 */
+    // delay_ms(2000);
     
-    /* 测试AT通信 */
-    for (retry = 0; retry < 3; retry++)
-    {
-        if (esp8266_send_cmd("AT", "OK", 50) == 0)
-            break;
-        delay_ms(500);
-    }
+    // /* 测试AT通信 */
+    // for (retry = 0; retry < 3; retry++)
+    // {
+    //     if (esp8266_send_cmd("AT", "OK", 50) == 0)
+    //         break;
+    //     delay_ms(500);
+    // }
     
     /* 设置WiFi工作模式为Station模式 */
     esp8266_send_cmd("AT+CWMODE=1", "OK", 50);
     
     /* 软复位模块，同步解析 boot 日志中的 wifi_mac 字段 */
-    prv_RST_ParseMAC();
-    delay_ms(2000);  /* 等待网络接口就绪 */
+    // prv_RST_ParseMAC();
+    // delay_ms(2000);  /* 等待网络接口就绪 */
     
     /* 连接WiFi路由器（必须！超时设为15秒）*/
     esp8266_send_cmd("AT+CWJAP=\"" WIFI_NAME "\",\"" WIFI_PASSWORD "\"", "GOT IP", 1500);

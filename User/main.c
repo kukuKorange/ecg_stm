@@ -84,12 +84,29 @@ int main(void){
 #endif
     
     OLED_Init();
-    
+
+    /* 显示开机画面 */
+    OLED_Clear();
+    OLED_ShowString(32, 0, "Booting...", OLED_8X16);
+
+    /* 串口初始化 */
+    OLED_ShowString(16, 16, "Init: USART2", OLED_6X8);
+    OLED_Update();
     usart2_init(115200);     /* 串口2初始化(PA2/PA3)为115200 esp-01s通信 */
+
+    /* ESP8266初始化 */
+    OLED_ShowString(16, 24, "Init: ESP8266", OLED_6X8);
+    OLED_Update();
     ESP8266_Init();
-    Transmit_Init();         /* 传输模块初始化 */
-    
+
+    /* 传输模块初始化 */
+    OLED_ShowString(16, 32, "Init: Transmit", OLED_6X8);
+    OLED_Update();
+    Transmit_Init();
+
     /* 心电图外设配置 */
+    OLED_ShowString(16, 40, "Init: ADC/ECG", OLED_6X8);
+    OLED_Update();
     AD_Init();
     AD8232Init();
     Timer3_Init();
@@ -98,9 +115,15 @@ int main(void){
 #ifdef USE_ECG_SIM
     ECG_Sim_Init(ECG_SIM_BPM);
 #endif
-    
+
     /* 按键初始化 */
+    OLED_ShowString(16, 48, "Init: Key", OLED_6X8);
+    OLED_Update();
     Key_Init();
+
+    /* 开机完成 */
+    OLED_ShowString(16, 56, "Done!", OLED_6X8);
+    OLED_Update();
 
     
     while(1){

@@ -69,7 +69,7 @@
  * 
  *         关闭: 注释此行（恢复真实AD8232采样）
  */
-#define USE_ECG_SIM
+// #define USE_ECG_SIM
 
 /**
  * @brief  启用DS18B20数字温度计
