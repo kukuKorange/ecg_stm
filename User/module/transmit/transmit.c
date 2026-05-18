@@ -14,6 +14,9 @@
 #ifdef USE_MAX30102
 #include "max30102.h"
 #endif
+#ifdef USE_DS18B20
+#include "ds18b20/ds18b20.h"
+#endif
 #ifdef USE_ECG_SIM
 #include "ecg_sim/ecg_sim.h"
 #endif
@@ -91,15 +94,20 @@ void Transmit_Process(void)
 
 /**
  * @brief  发送生命体征数据
- * @note   每5秒交替发送心率和血氧
+ * @note   每5秒依次发送心率、血氧、温度（开启DS18B20时）
  *         - 第1次调用: 发送心率
  *         - 第2次调用: 发送血氧
+ *         - 第3次调用: 发送温度
  *         - 循环...
  */
 void Transmit_SendVitalSign(void)
 {
 #ifdef USE_MAX30102
+#ifdef USE_DS18B20
+    static uint8_t send_toggle = 0;  /* 0:心率, 1:血氧, 2:温度 */
+#else
     static uint8_t send_toggle = 0;  /* 0:心率, 1:血氧 */
+#endif
     MAX30102_Data_t *data = MAX30102_GetData();
 #ifdef USE_ECG_SIM
     uint8_t ecg_hr = ECG_Sim_GetBPM();
@@ -107,14 +115,30 @@ void Transmit_SendVitalSign(void)
     uint8_t ecg_hr = ECG_GetHeartRate();
 #endif
     if (send_toggle == 0)
-    {   
+    {
         ESP8266_SendToTopic(MQTT_TOPIC_HEARTRATE, ecg_hr);
     }
-    else
+    else if (send_toggle == 1)
     {
         ESP8266_SendToTopic(MQTT_TOPIC_SPO2, data->spo2);
     }
-    send_toggle = !send_toggle;
+#ifdef USE_DS18B20
+    else if (send_toggle == 2)
+    {
+        if (g_ds18b20_data.is_valid)
+        {
+            ESP8266_SendToTopic(MQTT_TOPIC_TEMPERATURE, (int16_t)(g_ds18b20_data.temperature * 10));
+        }
+    }
+#endif
+    send_toggle++;
+#ifdef USE_DS18B20
+    if (send_toggle >= 3)
+        send_toggle = 0;
+#else
+    if (send_toggle >= 2)
+        send_toggle = 0;
+#endif
 #else
     /* 无MAX30102，仅发送ECG计算的心率 */
 #ifdef USE_ECG_SIM
@@ -122,7 +146,23 @@ void Transmit_SendVitalSign(void)
 #else
     uint8_t ecg_hr = ECG_GetHeartRate();
 #endif
+#ifdef USE_DS18B20
+    static uint8_t send_toggle = 0;  /* 0:心率, 1:温度 */
+    if (send_toggle == 0)
+    {
+        ESP8266_SendToTopic(MQTT_TOPIC_HEARTRATE, (uint16_t)ecg_hr);
+    }
+    else
+    {
+        if (g_ds18b20_data.is_valid)
+        {
+            ESP8266_SendToTopic(MQTT_TOPIC_TEMPERATURE, (int16_t)(g_ds18b20_data.temperature * 10));
+        }
+    }
+    send_toggle = !send_toggle;
+#else
     ESP8266_SendToTopic(MQTT_TOPIC_HEARTRATE, (uint16_t)ecg_hr);
+#endif
 #endif
 }
 

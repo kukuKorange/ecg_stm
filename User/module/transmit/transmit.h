@@ -68,7 +68,9 @@ void Transmit_Process(void);
 
 /**
  * @brief  发送生命体征数据
- * @note   发送心率和血氧到 MQTT 服务器
+ * @note   发送心率、血氧和温度到 MQTT 服务器
+ *         - 有DS18B20时：心率 → 血氧 → 温度 交替发送（各5秒一次）
+ *         - 无DS18B20时：心率 → 血氧 交替发送（各5秒一次）
  */
 void Transmit_SendVitalSign(void);
 
