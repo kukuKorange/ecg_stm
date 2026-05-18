@@ -188,7 +188,8 @@ void Display_Page0_HeartRate(void)
         }
         else
         {
-            OLED_ShowString(58, 36, "--.-", OLED_8X16);
+            /* 5字符宽度：对齐 OLED_ShowFloatNum 的 "+" + "xx" + "." + "x" */
+            OLED_ShowString(58, 36, " --.-", OLED_8X16);
         }
 #elif defined(USE_ECG_SIM)
     OLED_ShowNum(58, 36, ECG_Sim_GetBPM(), 3, OLED_8X16);
@@ -239,7 +240,8 @@ void Display_Page0_HeartRate(void)
             last_temp_valid = 1;
             last_temp = g_ds18b20_data.temperature;
             OLED_ShowFloatNum(58, 36, last_temp, 2, 1, OLED_8X16);
-            OLED_UpdateArea(58, 36, 32, 16); /* 刷新区域：4个字符 * 8像素宽 */
+            /* OLED_ShowFloatNum 会显示符号位：总宽 = (1 + IntLength + 1 + FraLength) * 8 = 40 */
+            OLED_UpdateArea(58, 36, 40, 16);
         }
     }
     else
@@ -248,8 +250,8 @@ void Display_Page0_HeartRate(void)
         {
             last_temp_valid = 0;
             last_temp = -127.0f;
-            OLED_ShowString(58, 36, "--.-", OLED_8X16);
-            OLED_UpdateArea(58, 36, 32, 16);
+            OLED_ShowString(58, 36, " --.-", OLED_8X16);
+            OLED_UpdateArea(58, 36, 40, 16);
         }
     }
 #elif defined(USE_ECG_SIM)
