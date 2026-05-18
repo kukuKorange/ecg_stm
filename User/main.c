@@ -31,6 +31,9 @@
 #ifdef USE_ECG_SIM
 #include "ecg_sim/ecg_sim.h"
 #endif
+#ifdef USE_DS18B20
+#include "ds18b20/ds18b20.h"
+#endif
 #include "module/display/display.h"
 #include "module/transmit/transmit.h"
 
@@ -75,6 +78,11 @@ int main(void){
     max30102_fir_init();
 #endif
     
+    /* 初始化DS18B20温度计模块（可通过kconfig.h中USE_DS18B20关闭） */
+#ifdef USE_DS18B20
+    DS18B20_Init();
+#endif
+    
     OLED_Init();
     
     usart2_init(115200);     /* 串口2初始化(PA2/PA3)为115200 esp-01s通信 */
@@ -110,6 +118,14 @@ int main(void){
         {
             max30102_process_flag = 0;
             MAX30102_Process();
+        }
+#endif
+        
+        /* ==================== 温度数据采集（10Hz，由定时器触发） ==================== */
+#ifdef USE_DS18B20
+        if (display_refresh_flag)
+        {
+            DS18B20_Process();  /* 周期性处理DS18B20，管理非阻塞式温度转换 */
         }
 #endif
         

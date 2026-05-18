@@ -16,6 +16,9 @@
 #ifdef USE_ECG_SIM
 #include "ecg_sim.h"
 #endif
+#ifdef USE_DS18B20
+#include "ds18b20/ds18b20.h"
+#endif
 
 /*============================================================================*/
 /*                              私有变量                                       */
@@ -31,6 +34,11 @@ static uint8_t  last_sim_bpm = 0xFF;      /**< 上次模拟器BPM（用于局部
 static uint16_t last_spo2 = 0xFFFF;       /**< 上次血氧值 */
 static uint8_t  last_finger = 0xFF;       /**< 上次手指检测状态 */
 #endif
+#ifdef USE_DS18B20
+static float last_temp = -127.0f;         /**< 上次温度值 */
+static uint8_t last_temp_valid = 0;       /**< 上次温度有效标志 */
+#endif
+
 
 /*============================================================================*/
 /*                              显示更新（主入口）                              */
@@ -115,6 +123,10 @@ static void Display_Page0_DrawStatic(void)
     /* 血氧标签（仅MAX30102模式） */
     OLED_ShowString(10, 36, "SpO2:", OLED_8X16);
     OLED_ShowString(100, 36, "%", OLED_8X16);
+#elif defined(USE_DS18B20)
+    /* 温度标签（DS18B20模式，占用SpO2行空位） */
+    OLED_ShowString(10, 36, "Temp:", OLED_8X16);
+    OLED_ShowString(100, 36, "C", OLED_8X16);
 #elif defined(USE_ECG_SIM)
     /* 模拟器BPM标签（仅USE_ECG_SIM模式，占用SpO2行空位） */
     OLED_ShowString(10, 36, "Sim:", OLED_8X16);
@@ -161,20 +173,36 @@ void Display_Page0_HeartRate(void)
         last_spo2   = 0xFFFF;
         last_finger = 0xFF;
 #endif
+#ifdef USE_DS18B20
+        last_temp = -127.0f; /* 强制刷新温度 */
+    last_temp_valid = 0;
+#endif
         OLED_ShowNum(50, 16, current_hr, 3, OLED_8X16);
 #ifdef USE_MAX30102
         OLED_ShowNum(60, 36, data->spo2, 3, OLED_8X16);
         OLED_ShowString(100, 0, data->finger_detected ? "OK" : "--", OLED_6X8);
+#elif defined(USE_DS18B20)
+        if (g_ds18b20_data.is_valid)
+        {
+            OLED_ShowFloatNum(58, 36, g_ds18b20_data.temperature, 2, 1, OLED_8X16);
+        }
+        else
+        {
+            OLED_ShowString(58, 36, "--.-", OLED_8X16);
+        }
 #elif defined(USE_ECG_SIM)
-        OLED_ShowNum(58, 36, ECG_Sim_GetBPM(), 3, OLED_8X16);
+    OLED_ShowNum(58, 36, ECG_Sim_GetBPM(), 3, OLED_8X16);
 #endif
         OLED_Update();
         last_hr = current_hr;
 #ifdef USE_MAX30102
         last_spo2   = data->spo2;
         last_finger = data->finger_detected;
+#elif defined(USE_DS18B20)
+    last_temp_valid = g_ds18b20_data.is_valid;
+    last_temp = g_ds18b20_data.is_valid ? g_ds18b20_data.temperature : -127.0f;
 #elif defined(USE_ECG_SIM)
-        last_sim_bpm = ECG_Sim_GetBPM();
+    last_sim_bpm = ECG_Sim_GetBPM();
 #endif
         return;
     }
@@ -202,6 +230,28 @@ void Display_Page0_HeartRate(void)
         OLED_ShowString(100, 0, data->finger_detected ? "OK" : "--", OLED_6X8);
         OLED_UpdateArea(100, 0, 12, 8);
     }
+#elif defined(USE_DS18B20)
+    /* 温度值变化时局部刷新 */
+    if (g_ds18b20_data.is_valid)
+    {
+        if (!last_temp_valid || (g_ds18b20_data.temperature != last_temp))
+        {
+            last_temp_valid = 1;
+            last_temp = g_ds18b20_data.temperature;
+            OLED_ShowFloatNum(58, 36, last_temp, 2, 1, OLED_8X16);
+            OLED_UpdateArea(58, 36, 32, 16); /* 刷新区域：4个字符 * 8像素宽 */
+        }
+    }
+    else
+    {
+        if (last_temp_valid)
+        {
+            last_temp_valid = 0;
+            last_temp = -127.0f;
+            OLED_ShowString(58, 36, "--.-", OLED_8X16);
+            OLED_UpdateArea(58, 36, 32, 16);
+        }
+    }
 #elif defined(USE_ECG_SIM)
     /* 模拟器BPM变化时局部刷新 */
     {
@@ -226,7 +276,7 @@ void Display_Page0_HeartRate(void)
 void Display_Page1_ECG(void)
 {
     uint8_t ecg_hr;
-    
+
     /* 标题 */
     OLED_ShowString(0, 0, "ECG Monitor", OLED_6X8);
     
